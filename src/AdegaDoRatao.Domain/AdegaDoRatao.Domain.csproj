@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Camada de DOMÍNIO.
+    Regra de ouro do Clean Architecture: este projeto NÃO pode referenciar
+    nenhum outro projeto da solução, nem pacotes de infraestrutura
+    (Entity Framework, ASP.NET, etc.). Aqui vivem apenas:
+      - Entidades (regras de negócio "puras")
+      - Enums
+      - Value Objects
+      - Exceções de domínio
+      - Interfaces de repositório (contratos, sem implementação)
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AdegaDoRatao.Domain</RootNamespace>
+  </PropertyGroup>
+
+</Project>

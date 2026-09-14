@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Camada de API.
+    É a "porta de entrada" HTTP da aplicação: Controllers finos,
+    middlewares, configuração de Swagger, autenticação e o Program.cs
+    que monta (compõe) todas as camadas via injeção de dependência.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AdegaDoRatao.API</RootNamespace>
+    <UserSecretsId>adega-do-ratao-api-secrets</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Geração da documentação Swagger/OpenAPI -->
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.8" />
+    <!-- Necessário para os comandos "dotnet ef" (migrations, database update) -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.8">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AdegaDoRatao.Application\AdegaDoRatao.Application.csproj" />
+    <ProjectReference Include="..\AdegaDoRatao.Infrastructure\AdegaDoRatao.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

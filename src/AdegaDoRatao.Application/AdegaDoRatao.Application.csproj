@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Camada de APLICAÇÃO.
+    Aqui ficam os casos de uso (Services), DTOs, validadores e as
+    interfaces que a Infrastructure vai implementar (ex.: IUnitOfWork,
+    IPasswordHasher, IJwtTokenGenerator). Esta camada conhece o Domain,
+    mas NÃO conhece EF Core, ASP.NET ou qualquer detalhe de infraestrutura.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AdegaDoRatao.Application</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Validação de DTOs de entrada (regras como "nome obrigatório", "preço >= 0") -->
+    <PackageReference Include="FluentValidation" Version="11.9.0" />
+    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.9.0" />
+    <!-- Registro dos serviços da camada de Application no container de DI -->
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AdegaDoRatao.Domain\AdegaDoRatao.Domain.csproj" />
+  </ItemGroup>
+
+</Project>
