@@ -26,39 +26,35 @@ public sealed class DashboardService(
         var inicioMes = new DateTime(hoje.Year, hoje.Month, 1);
         var fimMes = inicioMes.AddMonths(1).AddDays(-1);
 
-        // Executa todas as consultas em paralelo
-        var vendasHojeTask = sales.ContarPorPeriodoAsync(hoje, hoje.AddDays(1).AddTicks(-1), cancellationToken);
-        var vendasMesTask = sales.ContarPorPeriodoAsync(inicioMes, fimMes, cancellationToken);
-        var faturamentoHojeTask = sales.SomarTotalPorPeriodoAsync(hoje, hoje.AddDays(1).AddTicks(-1), cancellationToken);
-        var faturamentoMesTask = sales.SomarTotalPorPeriodoAsync(inicioMes, fimMes, cancellationToken);
-        var despesasMesTask = transactions.SomarPorTipoEPeriodoAsync(FinancialTransactionType.Saida, inicioMes, fimMes, cancellationToken);
-        var entradasMesTask = transactions.SomarPorTipoEPeriodoAsync(FinancialTransactionType.Entrada, inicioMes, fimMes, cancellationToken);
-        var estoqueBaixoTask = products.ListarComEstoqueBaixoAsync(cancellationToken);
-        var semEstoqueTask = products.ListarSemEstoqueAsync(cancellationToken);
-        var lucroBrutoTask = sales.SomarLucroBrutoEstimadoAsync(inicioMes, fimMes, cancellationToken);
-        var vendasRecentesTask = sales.ListarRecentesAsync(5, cancellationToken);
-        var maisVendidosTask = sales.ListarMaisVendidosAsync(inicioMes, fimMes, 5, cancellationToken);
-        var formasPagamentoTask = sales.ListarFormasPagamentoMaisUsadasAsync(inicioMes, fimMes, 5, cancellationToken);
-
-        await Task.WhenAll(
-            vendasHojeTask, vendasMesTask, faturamentoHojeTask, faturamentoMesTask,
-            despesasMesTask, entradasMesTask, estoqueBaixoTask, semEstoqueTask,
-            lucroBrutoTask, vendasRecentesTask, maisVendidosTask, formasPagamentoTask);
+        // Executa as consultas sequencialmente: os repositórios compartilham
+        // o mesmo DbContext (scoped), que não é thread-safe.
+        var vendasHoje = await sales.ContarPorPeriodoAsync(hoje, hoje.AddDays(1).AddTicks(-1), cancellationToken);
+        var vendasMes = await sales.ContarPorPeriodoAsync(inicioMes, fimMes, cancellationToken);
+        var faturamentoHoje = await sales.SomarTotalPorPeriodoAsync(hoje, hoje.AddDays(1).AddTicks(-1), cancellationToken);
+        var faturamentoMes = await sales.SomarTotalPorPeriodoAsync(inicioMes, fimMes, cancellationToken);
+        var despesasMes = await transactions.SomarPorTipoEPeriodoAsync(FinancialTransactionType.Saida, inicioMes, fimMes, cancellationToken);
+        var entradasMes = await transactions.SomarPorTipoEPeriodoAsync(FinancialTransactionType.Entrada, inicioMes, fimMes, cancellationToken);
+        var estoqueBaixo = await products.ListarComEstoqueBaixoAsync(cancellationToken);
+        var semEstoque = await products.ListarSemEstoqueAsync(cancellationToken);
+        var lucroBruto = await sales.SomarLucroBrutoEstimadoAsync(inicioMes, fimMes, cancellationToken);
+        var vendasRecentes = await sales.ListarRecentesAsync(5, cancellationToken);
+        var maisVendidos = await sales.ListarMaisVendidosAsync(inicioMes, fimMes, 5, cancellationToken);
+        var formasPagamento = await sales.ListarFormasPagamentoMaisUsadasAsync(inicioMes, fimMes, 5, cancellationToken);
 
         // Monta o resumo
         var summary = new DashboardSummaryResponse(
-            VendasHoje: vendasHojeTask.Result,
-            VendasMes: vendasMesTask.Result,
-            FaturamentoHoje: faturamentoHojeTask.Result,
-            FaturamentoMes: faturamentoMesTask.Result,
-            DespesasMes: despesasMesTask.Result,
-            SaldoMes: entradasMesTask.Result - despesasMesTask.Result,
-            ProdutosEstoqueBaixo: estoqueBaixoTask.Result.Count,
-            ProdutosSemEstoque: semEstoqueTask.Result.Count,
-            LucroBrutoEstimadoMes: lucroBrutoTask.Result);
+            VendasHoje: vendasHoje,
+            VendasMes: vendasMes,
+            FaturamentoHoje: faturamentoHoje,
+            FaturamentoMes: faturamentoMes,
+            DespesasMes: despesasMes,
+            SaldoMes: entradasMes - despesasMes,
+            ProdutosEstoqueBaixo: estoqueBaixo.Count,
+            ProdutosSemEstoque: semEstoque.Count,
+            LucroBrutoEstimadoMes: lucroBruto);
 
         // Vendas recentes (precisa do nome da forma de pagamento)
-        var paymentMethodIds = vendasRecentesTask.Result.Select(x => x.PaymentMethodId).Distinct().ToArray();
+        var paymentMethodIds = vendasRecentes.Select(x => x.PaymentMethodId).Distinct().ToArray();
         var paymentMethodNames = new Dictionary<Guid, string>();
         foreach (var pmId in paymentMethodIds)
         {
@@ -66,7 +62,7 @@ public sealed class DashboardService(
             paymentMethodNames[pmId] = pm?.Name ?? "—";
         }
 
-        var recentSales = vendasRecentesTask.Result
+        var recentSales = vendasRecentes
             .Select(s => new RecentSaleResponse(
                 s.Id, s.SaleNumber, s.Date, s.Total,
                 paymentMethodNames.GetValueOrDefault(s.PaymentMethodId, "—"),
@@ -81,12 +77,12 @@ public sealed class DashboardService(
             .ToArray();
 
         // Top produtos
-        var topProducts = maisVendidosTask.Result
+        var topProducts = maisVendidos
             .Select(x => new TopSellingProductResponse(x.ProductId, x.ProductName, x.Sku, x.TotalQuantity, x.TotalRevenue))
             .ToArray();
 
         // Top formas de pagamento
-        var topPaymentMethods = formasPagamentoTask.Result
+        var topPaymentMethods = formasPagamento
             .Select(x => new TopPaymentMethodResponse(x.PaymentMethodId, x.PaymentMethodName, x.TotalSales, x.TotalAmount))
             .ToArray();
 
