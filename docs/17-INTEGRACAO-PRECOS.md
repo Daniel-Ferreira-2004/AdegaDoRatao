@@ -2,12 +2,11 @@
 
 Endpoint adicionado:
 
-- `GET /api/products/{id}/precos-mercado` — compara o preço do produto nas
-  redes de varejo da região (Veran, Shibata, Atacadão, Semar), usando o EAN
+- `GET /api/products/{id}/precos-mercado` — compara o preço do produto em
+  **todas as lojas** encontradas na região, sem filtro de rede, usando o EAN
   (`Barcode`) cadastrado no produto. A consulta à API externa é filtrada por
-  estado (`state=SP`), sem filtro de cidade: cada rede retorna o menor preço
-  encontrado na região (Suzano, Poá, Ferraz de Vasconcelos etc.), com a
-  cidade indicada no campo `cidade` de cada item.
+  estado (`state=SP`), sem filtro de cidade: cada loja retorna seu preço e
+  cidade, ordenados do menor para o maior preço.
 
 Leitura exige `products.read` (ou `products.write`); ADMIN sempre tem acesso.
 

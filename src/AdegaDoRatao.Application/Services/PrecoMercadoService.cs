@@ -18,17 +18,9 @@ namespace AdegaDoRatao.Application.Services;
 /// </summary>
 public sealed class PrecoMercadoService : IPrecoMercadoService
 {
-    // Redes padrão da região de Suzano/SP. O cruzamento com o retorno da API
-    // é feito por correspondência de nome de loja (store_name) — ver
-    // DataMarketPrecoService na Infrastructure.
-    // TODO: validar com a Cnova se essas redes têm cobertura na base deles
-    // (na consulta de 16/09/2026 nenhuma delas apareceu para Suzano/SP).
-    private static readonly IReadOnlyCollection<string> RedesPadrao =
-        new[] { "Veran", "Shibata", "Atacadão", "Semar" };
-
-    // A consulta é feita por ESTADO (SP), sem filtro de cidade: assim cada
-    // rede retorna o menor preço encontrado na região (Suzano, Poá, Ferraz
-    // de Vasconcelos etc.), com a cidade indicada no item da resposta.
+    // A consulta é feita por ESTADO (SP), sem filtro de cidade nem de rede:
+    // todas as lojas encontradas na região são retornadas, ordenadas pelo
+    // menor preço, com a cidade indicada em cada item.
     private const string? CidadePadrao = null;
     private const string EstadoPadrao = "SP";
 
@@ -47,15 +39,13 @@ public sealed class PrecoMercadoService : IPrecoMercadoService
             throw new UseCaseException("O produto não possui código de barras (EAN) cadastrado.");
 
         var resultado = await _externo.ConsultarPrecosAsync(
-            produto.Barcode, CidadePadrao, EstadoPadrao, RedesPadrao, cancellationToken);
+            produto.Barcode, CidadePadrao, EstadoPadrao, cancellationToken);
 
         if (!resultado.Succeeded)
         {
-            var indisponiveis = RedesPadrao
-                .Select(rede => new PrecoMercadoRedeResponse(rede, CidadePadrao, null, false, resultado.Error))
-                .ToArray();
             return new PrecoMercadoResponse(produto.Id, produto.Name, produto.Barcode,
-                DateTime.UtcNow, OrigemCache: false, ConsultaFalhou: true, indisponiveis);
+                DateTime.UtcNow, OrigemCache: false, ConsultaFalhou: true,
+                Array.Empty<PrecoMercadoRedeResponse>());
         }
 
         return new PrecoMercadoResponse(produto.Id, produto.Name, produto.Barcode,

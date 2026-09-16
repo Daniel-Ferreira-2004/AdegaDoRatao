@@ -20,15 +20,15 @@ public sealed record ConsultaExternaPrecos(
 public interface IPrecoMercadoExternoService
 {
     /// <summary>
-    /// Consulta o preço de um EAN nas redes informadas.
+    /// Consulta o preço de um EAN em todas as lojas da região (estado/cidade),
+    /// sem filtro de rede — cada loja encontrada vira um item da resposta.
     /// Retorna Failure apenas em falha total da consulta (timeout, erro de
-    /// rede, 5xx). Rede sem o produto vem como item com Disponivel=false.
+    /// rede, 5xx). Produto não encontrado (404) devolve lista vazia.
     /// </summary>
     Task<Result<ConsultaExternaPrecos>> ConsultarPrecosAsync(
         string ean,
         string? cidade,
         string? estado,
-        IReadOnlyCollection<string> redes,
         CancellationToken cancellationToken = default);
 }
 

@@ -65,7 +65,7 @@ public class PrecosMercadoTests(CustomWebApplicationFactory factory)
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<PrecoMercadoResponse>();
         body!.ConsultaFalhou.Should().BeTrue();
-        body.Precos.Should().OnlyContain(p => !p.Disponivel && p.Preco == null);
+        body.Precos.Should().BeEmpty();
     }
 
     [Fact]
@@ -97,7 +97,7 @@ public class PrecosMercadoTests(CustomWebApplicationFactory factory)
     private sealed class FakePrecoExterno(Result<ConsultaExternaPrecos> resultado) : IPrecoMercadoExternoService
     {
         public Task<Result<ConsultaExternaPrecos>> ConsultarPrecosAsync(
-            string ean, string? cidade, string? estado, IReadOnlyCollection<string> redes,
+            string ean, string? cidade, string? estado,
             CancellationToken cancellationToken = default)
             => Task.FromResult(resultado);
     }

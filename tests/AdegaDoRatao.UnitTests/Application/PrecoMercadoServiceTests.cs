@@ -36,7 +36,7 @@ public class PrecoMercadoServiceTests
 
         await act.Should().ThrowAsync<UseCaseException>().WithMessage("*não encontrado*");
         _externo.Verify(x => x.ConsultarPrecosAsync(It.IsAny<string>(), It.IsAny<string?>(),
-            It.IsAny<string?>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()), Times.Never);
+            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -59,33 +59,30 @@ public class PrecoMercadoServiceTests
         _products.Setup(x => x.ObterPorIdAsync(produto.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(produto);
         _externo.Setup(x => x.ConsultarPrecosAsync(produto.Barcode!, It.IsAny<string?>(),
-                It.IsAny<string?>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<ConsultaExternaPrecos>.Failure("A consulta excedeu o tempo limite."));
         var service = CriarServico();
 
         var response = await service.ConsultarAsync(produto.Id);
 
         response.ConsultaFalhou.Should().BeTrue();
-        response.Precos.Should().HaveCount(4);
-        response.Precos.Should().OnlyContain(p => !p.Disponivel && p.Preco == null && p.Mensagem != null);
-        response.Precos.Select(p => p.Rede).Should().BeEquivalentTo("Veran", "Shibata", "Atacadão", "Semar");
+        response.Precos.Should().BeEmpty();
     }
 
     [Fact]
-    public async Task ConsultarAsync_RedeSemProduto_DeveMarcarApenasEssaRedeComoIndisponivel()
+    public async Task ConsultarAsync_ComLojasEncontradas_DeveRetornarTodasSemFiltroDeRede()
     {
         var produto = CriarProduto();
         _products.Setup(x => x.ObterPorIdAsync(produto.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(produto);
         IReadOnlyList<PrecoMercadoRedeResponse> precos = new PrecoMercadoRedeResponse[]
         {
-            new("Veran", "Suzano", 7.99m, true, null),
-            new("Shibata", "Suzano", null, false, "Preço indisponível nesta rede."),
-            new("Atacadão", "Suzano", 7.49m, true, null),
-            new("Semar", "Suzano", null, false, "Preço indisponível nesta rede."),
+            new("Oxan Atacadista", "São Paulo", 7.49m, true, null),
+            new("Super Tonin", "São Sebastião do Paraíso", 7.99m, true, null),
+            new("Loja Sem Preço", "Suzano", null, false, "Preço indisponível nesta loja."),
         };
         _externo.Setup(x => x.ConsultarPrecosAsync(produto.Barcode!, It.IsAny<string?>(),
-                It.IsAny<string?>(), It.IsAny<IReadOnlyCollection<string>>(), It.IsAny<CancellationToken>()))
+                It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result<ConsultaExternaPrecos>.Success(new ConsultaExternaPrecos(precos, OrigemCache: false)));
         var service = CriarServico();
 
@@ -93,7 +90,8 @@ public class PrecoMercadoServiceTests
 
         response.ConsultaFalhou.Should().BeFalse();
         response.Ean.Should().Be(produto.Barcode);
-        response.Precos.Single(p => p.Rede == "Veran").Preco.Should().Be(7.99m);
-        response.Precos.Single(p => p.Rede == "Shibata").Disponivel.Should().BeFalse();
+        response.Precos.Should().HaveCount(3);
+        response.Precos.Single(p => p.Rede == "Oxan Atacadista").Preco.Should().Be(7.49m);
+        response.Precos.Single(p => p.Rede == "Loja Sem Preço").Disponivel.Should().BeFalse();
     }
 }

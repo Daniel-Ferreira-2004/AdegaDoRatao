@@ -46,18 +46,17 @@ public sealed class DataMarketPrecoService : IPrecoMercadoExternoService
         string ean,
         string? cidade,
         string? estado,
-        IReadOnlyCollection<string> redes,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(_options.ApiKey))
             return Result<ConsultaExternaPrecos>.Failure(
                 "Integração de preços de mercado não configurada (DataMarket:ApiKey ausente).");
 
-        var cacheKey = $"precos-mercado:{ean}:{cidade}:{estado}:{string.Join(',', redes)}";
+        var cacheKey = $"precos-mercado:{ean}:{cidade}:{estado}";
         if (_cache.TryGetValue(cacheKey, out IReadOnlyList<PrecoMercadoRedeResponse>? cached) && cached is not null)
             return Result<ConsultaExternaPrecos>.Success(new ConsultaExternaPrecos(cached, OrigemCache: true));
 
-        var resultado = await ChamarApiAsync(ean, cidade, estado, redes, cancellationToken);
+        var resultado = await ChamarApiAsync(ean, cidade, estado, cancellationToken);
         if (resultado.Succeeded)
         {
             _cache.Set(cacheKey, resultado.Value!.Precos, TimeSpan.FromHours(_options.CacheHours));
@@ -66,7 +65,7 @@ public sealed class DataMarketPrecoService : IPrecoMercadoExternoService
     }
 
     private async Task<Result<ConsultaExternaPrecos>> ChamarApiAsync(
-        string ean, string? cidade, string? estado, IReadOnlyCollection<string> redes, CancellationToken cancellationToken)
+        string ean, string? cidade, string? estado, CancellationToken cancellationToken)
     {
         // Filtros confirmados contra a API real em 16/09/2026: os query params
         // "state" e "city" funcionam (ex.: ?state=SP&city=Suzano). Sem eles a
@@ -98,10 +97,9 @@ public sealed class DataMarketPrecoService : IPrecoMercadoExternoService
 
         if (response.StatusCode == HttpStatusCode.NotFound)
         {
-            var naoEncontrado = redes
-                .Select(rede => new PrecoMercadoRedeResponse(rede, cidade, null, false, "Produto não encontrado nesta rede."))
-                .ToArray();
-            return Result<ConsultaExternaPrecos>.Success(new ConsultaExternaPrecos(naoEncontrado, OrigemCache: false));
+            // Produto não encontrado na base: lista vazia, sem erro.
+            return Result<ConsultaExternaPrecos>.Success(
+                new ConsultaExternaPrecos(Array.Empty<PrecoMercadoRedeResponse>(), OrigemCache: false));
         }
 
         if (!response.IsSuccessStatusCode)
@@ -123,33 +121,28 @@ public sealed class DataMarketPrecoService : IPrecoMercadoExternoService
             return Result<ConsultaExternaPrecos>.Failure("A API de preços de mercado retornou um formato inesperado.");
         }
 
-        var precos = MapearPrecos(payload, cidade, redes);
+        var precos = MapearPrecos(payload, cidade);
         return Result<ConsultaExternaPrecos>.Success(new ConsultaExternaPrecos(precos, OrigemCache: false));
     }
 
     /// <summary>
-    /// Cruza o retorno da API com as redes desejadas. A API devolve as lojas
-    /// em <c>stores[]</c> com <c>store_name</c> livre (ex.: "Oxan Atacadista"),
-    /// então o cruzamento é por correspondência parcial do nome (case-insensitive).
-    /// Rede sem loja correspondente vira item indisponível — nunca quebra a consulta.
+    /// Converte todas as lojas do retorno da API (<c>stores[]</c>) em itens
+    /// de resposta, sem filtro de rede, ordenadas pelo menor preço. Lojas sem
+    /// preço vêm no final, marcadas como indisponíveis.
     /// </summary>
     private static IReadOnlyList<PrecoMercadoRedeResponse> MapearPrecos(
-        DataMarketProductResponse? payload, string? cidade, IReadOnlyCollection<string> redes)
+        DataMarketProductResponse? payload, string? cidade)
     {
         var lojas = payload?.Stores ?? [];
-        return redes.Select(rede =>
-        {
-            var ofertas = lojas
-                .Where(l => l.StoreName?.Contains(rede, StringComparison.OrdinalIgnoreCase) == true
-                            && l.Price is not null)
-                .ToArray();
-            if (ofertas.Length == 0)
-                return new PrecoMercadoRedeResponse(rede, cidade, null, false, "Preço indisponível nesta rede.");
-
-            // Se a rede tem mais de uma loja, mostramos o menor preço.
-            var melhor = ofertas.MinBy(l => l.Price!.Value)!;
-            return new PrecoMercadoRedeResponse(rede, melhor.City ?? cidade, melhor.Price, true, null);
-        }).ToArray();
+        return lojas
+            .Select(l => new PrecoMercadoRedeResponse(
+                l.StoreName ?? "Loja desconhecida",
+                l.City ?? cidade,
+                l.Price,
+                l.Price is not null,
+                l.Price is null ? "Preço indisponível nesta loja." : null))
+            .OrderBy(p => p.Preco ?? decimal.MaxValue)
+            .ToArray();
     }
 
     // Contrato real da resposta da Data Market (verificado em 16/09/2026):
