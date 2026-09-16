@@ -13,6 +13,8 @@ public sealed class JwtTokenGenerator : IJwtTokenGenerator
     private readonly JwtOptions _options;
     public JwtTokenGenerator(IOptions<JwtOptions> options) => _options = options.Value;
 
+    public int ExpirationMinutes => Math.Max(1, _options.ExpirationMinutes);
+
     public string Generate(Guid userId, string email, string role, IEnumerable<string> permissions)
     {
         if (string.IsNullOrWhiteSpace(_options.Secret) || _options.Secret.Length < 32)

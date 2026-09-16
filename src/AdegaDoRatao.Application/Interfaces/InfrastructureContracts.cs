@@ -25,5 +25,7 @@ public interface IPasswordHasher
 
 public interface IJwtTokenGenerator
 {
+    /// <summary>Tempo de expiração do token em minutos (Jwt:ExpirationMinutes).</summary>
+    int ExpirationMinutes { get; }
     string Generate(Guid userId, string email, string role, IEnumerable<string> permissions);
 }

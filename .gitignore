@@ -17,6 +17,10 @@ secrets.json
 logs/
 *.log
 
+# Saídas acidentais de comandos (ex.: redirecionamento de dotnet ef/build)
+ef-out.txt
+ef-err.txt
+
 # Banco de dados local (ex.: SQLite usado em testes)
 *.db
 
