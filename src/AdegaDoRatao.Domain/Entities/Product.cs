@@ -109,6 +109,17 @@ public class Product : BaseAuditableEntity
     }
 
     /// <summary>
+    /// Altera o código de barras (EAN). A unicidade é validada na camada de
+    /// Application (ProductService), pois depende de consulta ao banco —
+    /// mesma lógica do SKU (RN01).
+    /// </summary>
+    public void AlterarCodigoDeBarras(string? barcode)
+    {
+        SetBarcode(barcode);
+        MarcarComoAtualizada();
+    }
+
+    /// <summary>
     /// Altera os preços do produto (RN02: preços não podem ser negativos).
     /// Quem chama este método (ProductService) é responsável por gerar o
     /// registro de auditoria com o valor anterior/novo (RN05), pois a

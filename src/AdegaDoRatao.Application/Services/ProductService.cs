@@ -53,8 +53,11 @@ public sealed class ProductService : IProductService
     public async Task<ProductResponse> UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken cancellationToken = default)
     {
         var product = await GetRequiredAsync(id, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(request.Barcode) && await _products.CodigoDeBarrasJaExisteAsync(request.Barcode, id, cancellationToken))
+            throw new UseCaseException("Já existe um produto cadastrado com este código de barras.");
         await EnsureCatalogAsync(request.CategoryId, request.BrandId, cancellationToken);
         product.AtualizarDadosCadastrais(request.Name, request.Description, request.UnitOfMeasure, request.CategoryId, request.BrandId);
+        product.AlterarCodigoDeBarras(request.Barcode);
         product.AlterarLimitesDeEstoque(request.MinStock, request.MaxStock);
         product.PermitirEstoqueNegativo(request.AllowNegativeStock);
         _products.Atualizar(product);

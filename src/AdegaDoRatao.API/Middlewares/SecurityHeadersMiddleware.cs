@@ -18,7 +18,16 @@ public sealed class SecurityHeadersMiddleware(RequestDelegate next)
         headers["X-Content-Type-Options"] = "nosniff";
         headers["X-Frame-Options"] = "DENY";
         headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-        headers["Content-Security-Policy"] = "default-src 'self'";
+
+        // O Swagger UI (exposto apenas em Development) usa scripts e estilos
+        // inline, que o CSP restritivo bloquearia (tela branca). Para as
+        // rotas /swagger usamos uma política que permite inline; todo o
+        // resto da API continua com a política conservadora.
+        headers["Content-Security-Policy"] =
+            context.Request.Path.StartsWithSegments("/swagger")
+                ? "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+                : "default-src 'self'";
+
         await next(context);
     }
 }

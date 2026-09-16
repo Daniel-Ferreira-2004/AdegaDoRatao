@@ -38,6 +38,10 @@
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
     <!-- Opções tipadas para configurações como Jwt. -->
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
+
+    <!-- HttpClient tipado via IHttpClientFactory + cache em memória (integração Data Market) -->
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />
   </ItemGroup>
 
   <ItemGroup>

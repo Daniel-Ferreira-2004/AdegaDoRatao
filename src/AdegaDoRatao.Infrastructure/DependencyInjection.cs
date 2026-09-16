@@ -2,6 +2,7 @@
 using AdegaDoRatao.Application.Interfaces;
 using AdegaDoRatao.Domain.Interfaces;
 using AdegaDoRatao.Infrastructure.Auth;
+using AdegaDoRatao.Infrastructure.ExternalServices;
 using AdegaDoRatao.Infrastructure.Logging;
 using AdegaDoRatao.Infrastructure.Persistence;
 using AdegaDoRatao.Infrastructure.Repositories;
@@ -135,6 +136,27 @@ public static class DependencyInjection
 
         services.AddScoped<IPermissionRepository, PermissionRepository>();
 
+
+        // ============================================================
+        // INTEGRAÇÃO EXTERNA — PREÇOS DE MERCADO (Cnova Tech Data Market)
+        // ============================================================
+
+        // A API Key NUNCA fica no appsettings.json versionado: User Secrets
+        // em dev ("DataMarket:ApiKey") e variável de ambiente
+        // "DataMarket__ApiKey" em produção — mesmo padrão do Jwt:Secret.
+        services.Configure<DataMarketOptions>(
+            configuration.GetSection(DataMarketOptions.SectionName));
+
+        // Cache em memória para proteger a cota do plano Free (50 consultas/mês).
+        services.AddMemoryCache();
+
+        services.AddHttpClient<IPrecoMercadoExternoService, DataMarketPrecoService>((serviceProvider, client) =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<Microsoft.Extensions.Options.IOptions<DataMarketOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
 
         // ============================================================
         // FINALIZAÇÃO

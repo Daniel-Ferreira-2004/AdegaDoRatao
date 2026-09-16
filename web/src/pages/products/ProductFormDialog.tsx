@@ -91,6 +91,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
       const payload = {
         name: data.name,
         description: data.description || null,
+        barcode: data.barcode || null,
         categoryId: data.categoryId,
         brandId: data.brandId,
         unitOfMeasure: data.unitOfMeasure,
@@ -104,7 +105,6 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
       return createProduct({
         ...payload,
         sku: data.sku,
-        barcode: data.barcode || null,
         costPrice: data.costPrice,
         salePrice: data.salePrice,
       })
@@ -147,8 +147,8 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
             <FormField label="SKU" htmlFor="sku" error={errors.sku?.message} required>
               <Input id="sku" disabled={isEditing} {...register('sku')} />
             </FormField>
-            <FormField label="Código de barras" htmlFor="barcode" error={errors.barcode?.message}>
-              <Input id="barcode" disabled={isEditing} {...register('barcode')} />
+            <FormField label="Código de barras (EAN)" htmlFor="barcode" error={errors.barcode?.message}>
+              <Input id="barcode" placeholder="Ex.: 7894900011517" {...register('barcode')} />
             </FormField>
             <FormField label="Unidade" htmlFor="unitOfMeasure" error={errors.unitOfMeasure?.message} required>
               <Input id="unitOfMeasure" placeholder="UN, CX, LT..." {...register('unitOfMeasure')} />
