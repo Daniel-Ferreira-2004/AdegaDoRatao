@@ -51,8 +51,14 @@ public sealed class SaleRepository(AppDbContext context) : Repository<Sale>(cont
         => Set.CountAsync(x => x.Date >= from && x.Date <= to && x.Status == SaleStatus.Concluida, ct);
 
     public async Task<decimal> SomarTotalPorPeriodoAsync(DateTime from, DateTime to, CancellationToken ct = default)
-        => await Set.Where(x => x.Date >= from && x.Date <= to && x.Status == SaleStatus.Concluida)
-            .SumAsync(x => (decimal?)x.Total, ct) ?? 0;
+    {
+        // Sale.Total é calculado (não mapeado): soma os itens e subtrai o desconto no SQL.
+        var query = Set.Where(x => x.Date >= from && x.Date <= to && x.Status == SaleStatus.Concluida);
+        var subtotais = await query.SelectMany(x => x.Items)
+            .SumAsync(i => (decimal?)(i.Quantity * i.UnitPrice), ct) ?? 0;
+        var descontos = await query.SumAsync(x => (decimal?)x.Discount, ct) ?? 0;
+        return Math.Max(0, subtotais - descontos);
+    }
 
     public async Task<IReadOnlyList<Sale>> ListarRecentesAsync(int count, CancellationToken ct = default)
         => await Set.Include(x => x.Items)
@@ -86,22 +92,36 @@ public sealed class SaleRepository(AppDbContext context) : Repository<Sale>(cont
     public async Task<IReadOnlyList<(Guid PaymentMethodId, string PaymentMethodName, int TotalSales, decimal TotalAmount)>>
         ListarFormasPagamentoMaisUsadasAsync(DateTime from, DateTime to, int count, CancellationToken ct = default)
     {
-        var result = await Set
-            .Where(x => x.Date >= from && x.Date <= to && x.Status == SaleStatus.Concluida)
-            .Join(Context.PaymentMethods, s => s.PaymentMethodId, pm => pm.Id, (s, pm) => new { s, pm })
+        var vendas = Set.Where(x => x.Date >= from && x.Date <= to && x.Status == SaleStatus.Concluida);
+
+        // Sale.Total é calculado (não mapeado): soma os itens por forma de pagamento...
+        var result = await Context.SaleItems
+            .Join(vendas, si => si.SaleId, s => s.Id, (si, s) => new { si, s })
+            .Join(Context.PaymentMethods, x => x.s.PaymentMethodId, pm => pm.Id, (x, pm) => new { x.si, x.s, pm })
             .GroupBy(x => new { x.pm.Id, x.pm.Name })
             .Select(g => new
             {
                 g.Key.Id,
                 g.Key.Name,
-                TotalSales = g.Count(),
-                TotalAmount = g.Sum(x => x.s.Total)
+                TotalSales = g.Select(x => x.s.Id).Distinct().Count(),
+                TotalAmount = g.Sum(x => x.si.Quantity * x.si.UnitPrice)
             })
             .OrderByDescending(x => x.TotalSales)
             .Take(count)
             .ToListAsync(ct);
 
-        return result.Select(x => (x.Id, x.Name, x.TotalSales, x.TotalAmount)).ToList();
+        // ...e subtrai os descontos de cada forma de pagamento
+        var descontos = await vendas
+            .GroupBy(x => x.PaymentMethodId)
+            .Select(g => new { PaymentMethodId = g.Key, Desconto = g.Sum(x => x.Discount) })
+            .ToListAsync(ct);
+
+        return result.Select(x => (
+            x.Id,
+            x.Name,
+            x.TotalSales,
+            Math.Max(0, x.TotalAmount - (descontos.FirstOrDefault(d => d.PaymentMethodId == x.Id)?.Desconto ?? 0))
+        )).ToList();
     }
 
     public async Task<decimal> SomarLucroBrutoEstimadoAsync(DateTime from, DateTime to, CancellationToken ct = default)

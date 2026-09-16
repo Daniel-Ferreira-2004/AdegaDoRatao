@@ -23,7 +23,7 @@ public sealed class DashboardService(
     public async Task<DashboardResponse> GetDashboardAsync(CancellationToken cancellationToken = default)
     {
         var hoje = DateTime.UtcNow.Date;
-        var inicioMes = new DateTime(hoje.Year, hoje.Month, 1);
+        var inicioMes = new DateTime(hoje.Year, hoje.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var fimMes = inicioMes.AddMonths(1).AddDays(-1);
 
         // Executa as consultas sequencialmente: os repositórios compartilham
