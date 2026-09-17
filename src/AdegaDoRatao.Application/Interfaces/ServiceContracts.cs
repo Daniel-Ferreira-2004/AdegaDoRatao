@@ -11,6 +11,7 @@ public interface IProductService
     Task<ProductResponse> UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken cancellationToken = default);
     Task<ProductResponse> ChangePricesAsync(Guid id, ChangeProductPricesRequest request, CancellationToken cancellationToken = default);
     Task SetActiveAsync(Guid id, bool active, CancellationToken cancellationToken = default);
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
     Task<IReadOnlyList<ProductResponse>> GetLowStockAsync(bool includeOutOfStock, CancellationToken cancellationToken = default);
 }
 

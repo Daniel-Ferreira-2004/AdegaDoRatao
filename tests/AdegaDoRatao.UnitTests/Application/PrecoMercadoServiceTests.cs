@@ -70,16 +70,18 @@ public class PrecoMercadoServiceTests
     }
 
     [Fact]
-    public async Task ConsultarAsync_ComLojasEncontradas_DeveRetornarTodasSemFiltroDeRede()
+    public async Task ConsultarAsync_ComLojasEncontradas_DeveRetornarApenasRedesPermitidas()
     {
         var produto = CriarProduto();
         _products.Setup(x => x.ObterPorIdAsync(produto.Id, It.IsAny<CancellationToken>()))
             .ReturnsAsync(produto);
         IReadOnlyList<PrecoMercadoRedeResponse> precos = new PrecoMercadoRedeResponse[]
         {
-            new("Oxan Atacadista", "São Paulo", 7.49m, true, null),
-            new("Super Tonin", "São Sebastião do Paraíso", 7.99m, true, null),
-            new("Loja Sem Preço", "Suzano", null, false, "Preço indisponível nesta loja."),
+            new("Assaí Atacadista", "Suzano", 7.49m, true, null),
+            new("Shibata Supermercados", "Suzano", 7.99m, true, null),
+            new("Oxan Atacadista", "São Paulo", 6.99m, true, null),
+            new("Super Tonin", "São Sebastião do Paraíso", 7.19m, true, null),
+            new("Veran Suzano", "Suzano", null, false, "Preço indisponível nesta loja."),
         };
         _externo.Setup(x => x.ConsultarPrecosAsync(produto.Barcode!, It.IsAny<string?>(),
                 It.IsAny<string?>(), It.IsAny<CancellationToken>()))
@@ -90,8 +92,41 @@ public class PrecoMercadoServiceTests
 
         response.ConsultaFalhou.Should().BeFalse();
         response.Ean.Should().Be(produto.Barcode);
-        response.Precos.Should().HaveCount(3);
-        response.Precos.Single(p => p.Rede == "Oxan Atacadista").Preco.Should().Be(7.49m);
-        response.Precos.Single(p => p.Rede == "Loja Sem Preço").Disponivel.Should().BeFalse();
+        // Oxan e Super Tonin não estão na lista de redes permitidas.
+        response.Precos.Select(p => p.Rede).Should().BeEquivalentTo(
+            "Assaí Atacadista", "Shibata Supermercados", "Veran Suzano");
+        response.Precos.Single(p => p.Rede == "Assaí Atacadista").Preco.Should().Be(7.49m);
+        response.Precos.Single(p => p.Rede == "Veran Suzano").Disponivel.Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData("Sonda Supermercados", true)]
+    [InlineData("Nagumo", true)]
+    [InlineData("Atacadão Dia a Dia", true)]
+    [InlineData("Tenda Atacado", true)]
+    [InlineData("Rossi", true)]
+    [InlineData("Extra Hiper", true)]
+    [InlineData("Semar", true)]
+    [InlineData("D'Avó Supermercados", true)]
+    [InlineData("Soni", true)]
+    [InlineData("Carrefour", false)]
+    [InlineData("Pão de Açúcar", false)]
+    public async Task ConsultarAsync_FiltroDeRedes_DeveRespeitarListaPermitida(string rede, bool esperado)
+    {
+        var produto = CriarProduto();
+        _products.Setup(x => x.ObterPorIdAsync(produto.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(produto);
+        IReadOnlyList<PrecoMercadoRedeResponse> precos = new PrecoMercadoRedeResponse[]
+        {
+            new(rede, "Suzano", 7.49m, true, null),
+        };
+        _externo.Setup(x => x.ConsultarPrecosAsync(produto.Barcode!, It.IsAny<string?>(),
+                It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result<ConsultaExternaPrecos>.Success(new ConsultaExternaPrecos(precos, OrigemCache: false)));
+        var service = CriarServico();
+
+        var response = await service.ConsultarAsync(produto.Id);
+
+        response.Precos.Any().Should().Be(esperado);
     }
 }

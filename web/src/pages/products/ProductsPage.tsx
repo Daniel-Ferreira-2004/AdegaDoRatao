@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MoreHorizontal, Pencil, Plus, DollarSign, Power } from 'lucide-react'
-import { getProducts, setProductActive } from '@/services/products/productsService'
+import { MoreHorizontal, Pencil, Plus, DollarSign, Power, Store, Trash2 } from 'lucide-react'
+import { deleteProduct, getProducts, setProductActive } from '@/services/products/productsService'
 import { categoriesService } from '@/services/catalog/catalogService'
 import type { ProductResponse } from '@/types/api'
 import { formatCurrency } from '@/utils/format'
@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ProductFormDialog } from './ProductFormDialog'
 import { PricesDialog } from './PricesDialog'
+import { MarketPricesDialog } from './MarketPricesDialog'
 
 export default function ProductsPage() {
   const { hasPermission } = useAuth()
@@ -49,7 +50,9 @@ export default function ProductsPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<ProductResponse | null>(null)
   const [pricesProduct, setPricesProduct] = useState<ProductResponse | null>(null)
+  const [marketPricesProduct, setMarketPricesProduct] = useState<ProductResponse | null>(null)
   const [toggling, setToggling] = useState<ProductResponse | null>(null)
+  const [deleting, setDeleting] = useState<ProductResponse | null>(null)
 
   const { data: categories } = useQuery({ queryKey: ['categories'], queryFn: categoriesService.list })
 
@@ -79,6 +82,19 @@ export default function ProductsPage() {
     onError: (error) => {
       toast({ variant: 'error', title: 'Operação não concluída.', description: error.message })
       setToggling(null)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (product: ProductResponse) => deleteProduct(product.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      toast({ variant: 'success', title: 'Produto excluído com sucesso.' })
+      setDeleting(null)
+    },
+    onError: (error) => {
+      toast({ variant: 'error', title: 'Não foi possível excluir o produto.', description: error.message })
+      setDeleting(null)
     },
   })
 
@@ -187,8 +203,20 @@ export default function ProductsPage() {
                               <DropdownMenuItem onClick={() => setPricesProduct(product)}>
                                 <DollarSign /> Alterar preços
                               </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setMarketPricesProduct(product)}
+                                disabled={!product.barcode}
+                              >
+                                <Store /> Comparar preços
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setToggling(product)}>
                                 <Power /> {product.isActive ? 'Desativar' : 'Ativar'}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setDeleting(product)}
+                                className="text-destructive focus:text-destructive"
+                              >
+                                <Trash2 /> Excluir
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -206,6 +234,7 @@ export default function ProductsPage() {
 
       <ProductFormDialog open={formOpen} onOpenChange={setFormOpen} product={editing} />
       <PricesDialog open={pricesProduct !== null} onOpenChange={(open) => !open && setPricesProduct(null)} product={pricesProduct} />
+      <MarketPricesDialog open={marketPricesProduct !== null} onOpenChange={(open) => !open && setMarketPricesProduct(null)} product={marketPricesProduct} />
       <ConfirmDialog
         open={toggling !== null}
         onOpenChange={(open) => !open && setToggling(null)}
@@ -218,6 +247,15 @@ export default function ProductsPage() {
         confirmLabel={toggling?.isActive ? 'Desativar' : 'Ativar'}
         loading={toggleMutation.isPending}
         onConfirm={() => toggling && toggleMutation.mutate(toggling)}
+      />
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(open) => !open && setDeleting(null)}
+        title="Excluir produto"
+        description={`Tem certeza que deseja excluir "${deleting?.name}"? Esta ação não pode ser desfeita. Produtos com histórico de movimentações, compras ou vendas não podem ser excluídos — nesse caso, desative o produto.`}
+        confirmLabel="Excluir"
+        loading={deleteMutation.isPending}
+        onConfirm={() => deleting && deleteMutation.mutate(deleting)}
       />
     </>
   )

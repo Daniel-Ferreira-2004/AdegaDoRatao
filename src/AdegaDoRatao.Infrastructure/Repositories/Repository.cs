@@ -15,4 +15,5 @@ public abstract class Repository<T> : IRepository<T> where T : BaseEntity
     public virtual async Task<IReadOnlyList<T>> ListarTodosAsync(CancellationToken ct = default) => await Set.ToListAsync(ct);
     public Task AdicionarAsync(T entity, CancellationToken ct = default) => Set.AddAsync(entity, ct).AsTask();
     public void Atualizar(T entity) => Set.Update(entity);
+    public void Remover(T entity) => Set.Remove(entity);
 }

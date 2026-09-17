@@ -21,4 +21,6 @@ public interface IRepository<T> where T : BaseEntity
     Task AdicionarAsync(T entidade, CancellationToken cancellationToken = default);
 
     void Atualizar(T entidade);
+
+    void Remover(T entidade);
 }

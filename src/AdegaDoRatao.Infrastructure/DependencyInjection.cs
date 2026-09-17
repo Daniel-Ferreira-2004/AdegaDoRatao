@@ -102,6 +102,13 @@ public static class DependencyInjection
 
 
         // ============================================================
+        // MERCADOS (filtro de mercados próximos)
+        // ============================================================
+
+        services.AddScoped<IMarketRepository, MarketRepository>();
+
+
+        // ============================================================
         // COMPRAS
         // ============================================================
 
@@ -154,6 +161,24 @@ public static class DependencyInjection
         {
             var options = serviceProvider
                 .GetRequiredService<Microsoft.Extensions.Options.IOptions<DataMarketOptions>>().Value;
+            client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
+
+        // ============================================================
+        // INTEGRAÇÃO EXTERNA — GEOCODIFICAÇÃO (Nominatim/OpenStreetMap)
+        // ============================================================
+
+        // Nominatim é gratuito e não exige chave. Se migrar para provedor
+        // pago (ex.: Google), a chave vai em User Secrets ("Geocoding:ApiKey")
+        // ou variável de ambiente "Geocoding__ApiKey" — nunca no appsettings.
+        services.Configure<GeocodingOptions>(
+            configuration.GetSection(GeocodingOptions.SectionName));
+
+        services.AddHttpClient<IGeocodingService, NominatimGeocodingService>((serviceProvider, client) =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<Microsoft.Extensions.Options.IOptions<GeocodingOptions>>().Value;
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         });

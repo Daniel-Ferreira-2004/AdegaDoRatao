@@ -26,6 +26,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IAuditQueryService, AuditQueryService>();
         services.AddScoped<IPrecoMercadoService, PrecoMercadoService>();
+        services.AddScoped<IMercadoService, MercadoService>();
         return services;
     }
 }

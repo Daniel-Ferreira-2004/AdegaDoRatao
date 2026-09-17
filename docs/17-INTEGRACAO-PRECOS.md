@@ -2,11 +2,18 @@
 
 Endpoint adicionado:
 
-- `GET /api/products/{id}/precos-mercado` — compara o preço do produto em
-  **todas as lojas** encontradas na região, sem filtro de rede, usando o EAN
-  (`Barcode`) cadastrado no produto. A consulta à API externa é filtrada por
-  estado (`state=SP`), sem filtro de cidade: cada loja retorna seu preço e
-  cidade, ordenados do menor para o maior preço.
+- `GET /api/products/{id}/precos-mercado` — compara o preço do produto nos
+  supermercados do **estado de SP** (filtro `state=SP`, sem filtro de
+  cidade — a Data Market não tem cobertura de lojas em Suzano, e o filtro
+  por cidade sempre retornava vazio), usando o EAN (`Barcode`) cadastrado
+  no produto. Cada loja retorna rede, cidade, preço e disponibilidade,
+  ordenados do menor para o maior preço.
+- **Filtro de redes**: apenas as redes abaixo aparecem na resposta (a
+  comparação ignora acentos e aceita variações como "Assaí Atacadista" ou
+  "D'Avó Supermercados"):
+  Sonda, Shibata, Nagumo, Atacadão, Tenda Atacado, Rossi, Extra, Semar,
+  Veran, D'avó, Assaí e Soni. A lista fica em `RedesPermitidas` no
+  `PrecoMercadoService`.
 
 Leitura exige `products.read` (ou `products.write`); ADMIN sempre tem acesso.
 

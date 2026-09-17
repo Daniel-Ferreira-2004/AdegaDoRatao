@@ -86,6 +86,26 @@ export interface CreateProductRequest {
   allowNegativeStock: boolean
 }
 
+// ---- Preços de mercado (comparação externa) ----
+export interface PrecoMercadoRedeResponse {
+  rede: string
+  cidade: string | null
+  preco: number | null
+  disponivel: boolean
+  mensagem: string | null
+  distanciaKm: number | null
+}
+
+export interface PrecoMercadoResponse {
+  produtoId: string
+  produtoNome: string
+  ean: string
+  consultadoEm: string
+  origemCache: boolean
+  consultaFalhou: boolean
+  precos: PrecoMercadoRedeResponse[]
+}
+
 export interface UpdateProductRequest {
   name: string
   description?: string | null

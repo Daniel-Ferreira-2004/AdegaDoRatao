@@ -17,9 +17,13 @@ public sealed class ProductsController(IProductService service, IPrecoMercadoSer
     public Task<ProductResponse> Get(Guid id, CancellationToken ct) => service.GetByIdAsync(id, ct);
 
     /// <summary>
-    /// Compara o preço do produto nas redes de varejo da região (Veran,
-    /// Shibata, Atacadão, Semar) via API externa Cnova Tech Data Market,
-    /// usando o EAN cadastrado no produto. Resultado cacheado por 6h
+    /// Compara o preço do produto nos supermercados do estado de SP das
+    /// redes Sonda, Shibata, Nagumo, Atacadão, Tenda Atacado, Rossi, Extra,
+    /// Semar, Veran, D'avó, Assaí e Soni, via API externa Cnova Tech Data
+    /// Market, usando o EAN cadastrado no produto. Cada item retorna rede,
+    /// cidade, preço, disponibilidade e distância estimada (km) a partir de
+    /// Ferraz de Vasconcelos. Ordenado: disponíveis primeiro, menor preço,
+    /// mais perto. Resultado cacheado por 6h
     /// (configurável em DataMarket:CacheHours). Redes sem o produto vêm
     /// com disponivel=false — a chamada nunca retorna 500 por falha da
     /// API externa.
@@ -36,4 +40,14 @@ public sealed class ProductsController(IProductService service, IPrecoMercadoSer
     public Task<ProductResponse> ChangePrices(Guid id, ChangeProductPricesRequest request, CancellationToken ct) => service.ChangePricesAsync(id, request, ct);
     [HttpPatch("{id:guid}/active"), Authorize(Policy = "products.write")]
     public async Task<IActionResult> SetActive(Guid id, ActiveStatusRequest request, CancellationToken ct) { await service.SetActiveAsync(id, request.IsActive, ct); return NoContent(); }
+
+    /// <summary>
+    /// Exclui o produto (RN36). Só é possível quando o produto nunca foi
+    /// movimentado, comprado ou vendido; caso contrário retorna 400
+    /// orientando a desativação (exclusão lógica).
+    /// </summary>
+    [HttpDelete("{id:guid}"), Authorize(Policy = "products.write")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct) { await service.DeleteAsync(id, ct); return NoContent(); }
 }

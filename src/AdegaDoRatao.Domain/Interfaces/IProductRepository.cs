@@ -18,4 +18,11 @@ public interface IProductRepository : IRepository<Product>
     Task<IReadOnlyList<Product>> ListarComEstoqueBaixoAsync(CancellationToken cancellationToken = default);
 
     Task<IReadOnlyList<Product>> ListarSemEstoqueAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Indica se o produto possui qualquer histórico (movimentação de estoque,
+    /// item de compra ou item de venda). Usado pela RN36 para decidir entre
+    /// exclusão física (sem histórico) ou apenas desativação (com histórico).
+    /// </summary>
+    Task<bool> PossuiHistoricoAsync(Guid id, CancellationToken cancellationToken = default);
 }

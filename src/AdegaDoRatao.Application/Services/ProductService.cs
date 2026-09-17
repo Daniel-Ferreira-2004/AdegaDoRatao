@@ -88,6 +88,24 @@ public sealed class ProductService : IProductService
             new { product.IsActive }, cancellationToken);
     }
 
+    /// <summary>
+    /// Exclui o produto (RN36): exclusão física apenas quando não há nenhum
+    /// histórico (movimentação, compra ou venda). Com histórico, orienta a
+    /// desativação — o registro precisa ser preservado para o histórico.
+    /// </summary>
+    public async Task DeleteAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var product = await GetRequiredAsync(id, cancellationToken);
+        if (await _products.PossuiHistoricoAsync(id, cancellationToken))
+            throw new UseCaseException(
+                "Este produto possui histórico de movimentações, compras ou vendas e não pode ser excluído. " +
+                "Desative-o para que não apareça em novas operações.");
+
+        _products.Remover(product);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _audit.RegisterAsync("DELETE", nameof(Product), id.ToString(), ToResponse(product), null, cancellationToken);
+    }
+
     public async Task<IReadOnlyList<ProductResponse>> GetLowStockAsync(bool includeOutOfStock, CancellationToken cancellationToken = default)
     {
         var products = await _products.ListarComEstoqueBaixoAsync(cancellationToken);

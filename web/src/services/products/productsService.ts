@@ -4,6 +4,7 @@ import type {
   ChangeProductPricesRequest,
   CreateProductRequest,
   PagedResult,
+  PrecoMercadoResponse,
   ProductQuery,
   ProductResponse,
   UpdateProductRequest,
@@ -36,4 +37,13 @@ export async function changeProductPrices(id: string, request: ChangeProductPric
 
 export async function setProductActive(id: string, request: ActiveStatusRequest): Promise<void> {
   await apiClient.patch(`/products/${id}/active`, request)
+}
+
+export async function getPrecosMercado(id: string): Promise<PrecoMercadoResponse> {
+  const { data } = await apiClient.get<PrecoMercadoResponse>(`/products/${id}/precos-mercado`)
+  return data
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  await apiClient.delete(`/products/${id}`)
 }
