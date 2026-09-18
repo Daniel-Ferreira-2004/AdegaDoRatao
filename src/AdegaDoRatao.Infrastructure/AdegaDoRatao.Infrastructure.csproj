@@ -39,6 +39,9 @@
     <!-- Opções tipadas para configurações como Jwt. -->
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
 
+    <!-- Navegador automatizado para os coletores de preço (Shibata/Sonda) -->
+    <PackageReference Include="Microsoft.Playwright" Version="1.49.0" />
+
     <!-- HttpClient tipado via IHttpClientFactory + cache em memória (integração Data Market) -->
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.1" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="8.0.1" />

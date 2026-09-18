@@ -57,9 +57,11 @@ public sealed class PrecoMercadoService : IPrecoMercadoService
 
     private readonly IProductRepository _products;
     private readonly IPrecoMercadoExternoService _externo;
+    private readonly IMarketPriceSnapshotRepository _snapshots;
 
-    public PrecoMercadoService(IProductRepository products, IPrecoMercadoExternoService externo)
-        => (_products, _externo) = (products, externo);
+    public PrecoMercadoService(IProductRepository products, IPrecoMercadoExternoService externo,
+        IMarketPriceSnapshotRepository snapshots)
+        => (_products, _externo, _snapshots) = (products, externo, snapshots);
 
     public async Task<PrecoMercadoResponse> ConsultarAsync(Guid produtoId, CancellationToken cancellationToken = default)
     {
@@ -69,6 +71,26 @@ public sealed class PrecoMercadoService : IPrecoMercadoService
         if (string.IsNullOrWhiteSpace(produto.Barcode))
             throw new UseCaseException("O produto não possui código de barras (EAN) cadastrado.");
 
+        // 1) Snapshots locais coletados pelo agente de preços (Tenda,
+        //    Atacadão, Shibata, Sonda) — atualizados pelo job diário.
+        var locais = await _snapshots.ListarPorEanAsync(produto.Barcode, cancellationToken);
+        if (locais.Count > 0)
+        {
+            var itens = locais
+                .Select(s => new PrecoMercadoRedeResponse(
+                    s.Rede, null, s.Preco, s.Disponivel,
+                    s.Disponivel ? null : "Produto indisponível nesta rede.",
+                    DistanciaKm: null))
+                .OrderBy(p => p.Disponivel ? 0 : 1)
+                .ThenBy(p => p.Preco ?? decimal.MaxValue)
+                .ToArray();
+
+            return new PrecoMercadoResponse(produto.Id, produto.Name, produto.Barcode,
+                DateTime.UtcNow, OrigemCache: true, ConsultaFalhou: false, itens);
+        }
+
+        // 2) Fallback: API externa Data Market (quando o agente ainda não
+        //    coletou este EAN).
         var resultado = await _externo.ConsultarPrecosAsync(
             produto.Barcode, CidadePadrao, EstadoPadrao, cancellationToken);
 

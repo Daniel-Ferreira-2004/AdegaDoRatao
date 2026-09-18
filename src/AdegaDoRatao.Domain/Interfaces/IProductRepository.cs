@@ -25,4 +25,7 @@ public interface IProductRepository : IRepository<Product>
     /// exclusão física (sem histórico) ou apenas desativação (com histórico).
     /// </summary>
     Task<bool> PossuiHistoricoAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>EANs (códigos de barras) dos produtos ativos que possuem EAN cadastrado.</summary>
+    Task<IReadOnlyList<string>> ListarEansAtivosAsync(CancellationToken cancellationToken = default);
 }

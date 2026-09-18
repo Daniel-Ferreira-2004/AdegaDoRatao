@@ -1,8 +1,10 @@
 
 using AdegaDoRatao.Application.Interfaces;
+using AdegaDoRatao.Application.Services;
 using AdegaDoRatao.Domain.Interfaces;
 using AdegaDoRatao.Infrastructure.Auth;
 using AdegaDoRatao.Infrastructure.ExternalServices;
+using AdegaDoRatao.Infrastructure.ExternalServices.Coletores;
 using AdegaDoRatao.Infrastructure.Logging;
 using AdegaDoRatao.Infrastructure.Persistence;
 using AdegaDoRatao.Infrastructure.Repositories;
@@ -107,6 +109,8 @@ public static class DependencyInjection
 
         services.AddScoped<IMarketRepository, MarketRepository>();
 
+        services.AddScoped<IMarketPriceSnapshotRepository, MarketPriceSnapshotRepository>();
+
 
         // ============================================================
         // COMPRAS
@@ -182,6 +186,22 @@ public static class DependencyInjection
             client.BaseAddress = new Uri(options.BaseUrl.TrimEnd('/') + "/");
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         });
+
+        // ============================================================
+        // AGENTE DE PREÇOS — COLETORES POR REDE + JOB DIÁRIO
+        // ============================================================
+
+        // Coletores rápidos (HTTP direto, sem navegador).
+        services.AddHttpClient<IPrecoRedeCollector, TendaPrecoCollector>(TendaPrecoCollectorSetup.Configurar);
+        services.AddHttpClient<IPrecoRedeCollector, AtacadaoPrecoCollector>(AtacadaoPrecoCollectorSetup.Configurar);
+
+        // Coletores via Playwright (navegador real) — lentos, só no job diário.
+        // Requer 'playwright install chromium' após o build (ver docs/19-AGENTE-PRECOS.md).
+        services.AddScoped<IPrecoRedeCollector, ShibataPrecoCollector>();
+        services.AddScoped<IPrecoRedeCollector, SondaPrecoCollector>();
+
+        services.AddScoped<IAtualizadorPrecosRedesService, AtualizadorPrecosRedesService>();
+        services.AddHostedService<AtualizadorPrecosRedesJob>();
 
         // ============================================================
         // FINALIZAÇÃO

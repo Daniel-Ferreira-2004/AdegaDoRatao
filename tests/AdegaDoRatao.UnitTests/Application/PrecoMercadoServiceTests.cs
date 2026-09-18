@@ -18,8 +18,15 @@ public class PrecoMercadoServiceTests
 {
     private readonly Mock<IProductRepository> _products = new();
     private readonly Mock<IPrecoMercadoExternoService> _externo = new();
+    private readonly Mock<IMarketPriceSnapshotRepository> _snapshots = new();
 
-    private PrecoMercadoService CriarServico() => new(_products.Object, _externo.Object);
+    private PrecoMercadoService CriarServico()
+    {
+        // Por padrão, sem snapshots locais — cai no fluxo da API externa.
+        _snapshots.Setup(x => x.ListarPorEanAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<MarketPriceSnapshot>());
+        return new(_products.Object, _externo.Object, _snapshots.Object);
+    }
 
     private static Product CriarProduto(string? barcode = "7894900011517") => new(
         "Coca-Cola 2L", null, "COCA-2L", barcode, Guid.NewGuid(), Guid.NewGuid(),
@@ -97,6 +104,32 @@ public class PrecoMercadoServiceTests
             "Assaí Atacadista", "Shibata Supermercados", "Veran Suzano");
         response.Precos.Single(p => p.Rede == "Assaí Atacadista").Preco.Should().Be(7.49m);
         response.Precos.Single(p => p.Rede == "Veran Suzano").Disponivel.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ConsultarAsync_ComSnapshotsLocais_DeveRetornarSnapshotsSemChamarApiExterna()
+    {
+        var produto = CriarProduto();
+        _products.Setup(x => x.ObterPorIdAsync(produto.Id, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(produto);
+        var service = CriarServico();
+        // Sobrescreve o setup padrão (lista vazia) com os snapshots do cenário.
+        _snapshots.Setup(x => x.ListarPorEanAsync(produto.Barcode!, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new MarketPriceSnapshot(produto.Barcode!, "Tenda", "Coca-Cola 2L", 9.19m, true),
+                new MarketPriceSnapshot(produto.Barcode!, "Atacadão", "Coca-Cola 2L", 8.99m, true),
+                new MarketPriceSnapshot(produto.Barcode!, "Shibata", null, null, false),
+            });
+
+        var response = await service.ConsultarAsync(produto.Id);
+
+        response.ConsultaFalhou.Should().BeFalse();
+        response.Precos.Should().HaveCount(3);
+        // Ordenação: disponíveis pelo menor preço; indisponível por último.
+        response.Precos.Select(p => p.Rede).Should().Equal("Atacadão", "Tenda", "Shibata");
+        _externo.Verify(x => x.ConsultarPrecosAsync(It.IsAny<string>(), It.IsAny<string?>(),
+            It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Theory]
