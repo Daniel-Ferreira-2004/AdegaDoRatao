@@ -23,17 +23,36 @@ public sealed class AtacadaoPrecoCollector(
 {
     public string Rede => "Atacadão";
 
-    public async Task<Result<ColetaPrecoRede>> ColetarAsync(string ean, CancellationToken cancellationToken = default)
+    public async Task<Result<ColetaPrecoRede>> ColetarAsync(string ean, string? nomeProduto = null, CancellationToken cancellationToken = default)
     {
         try
         {
+            // Prefere o nome do produto (a VTEX nem sempre indexa EAN na
+            // busca textual); cai para o EAN quando não há nome.
+            // sc=2: canal de vendas da loja física da região — sem ele a
+            // VTEX retorna Price=0 e AvailableQuantity=0 (sem estoque).
+            var termo = string.IsNullOrWhiteSpace(nomeProduto) ? ean : nomeProduto;
             var produtos = await http.GetFromJsonAsync<List<VtexProduct>>(
-                $"io/api/catalog_system/pub/products/search?ft={Uri.EscapeDataString(ean)}&_from=0&_to=5",
+                $"io/api/catalog_system/pub/products/search?ft={Uri.EscapeDataString(termo)}&_from=0&_to=5&sc=2",
                 cancellationToken);
 
-            var produto = produtos?
-                .SelectMany(p => p.Items ?? [], (p, i) => (p, i))
+            var itens = produtos?.SelectMany(p => p.Items ?? [], (p, i) => (p, i)).ToList();
+
+            // 1) Confirma pelo EAN quando o item o expõe.
+            // 2) Senão, escolhe o resultado cujo nome melhor casa com o
+            //    termo buscado (tokens: "doritos" + "120" etc.), exigindo
+            //    score mínimo para não trazer produto errado.
+            (VtexProduct p, VtexItem i)? produto = itens?
                 .FirstOrDefault(x => string.Equals(x.i.Ean, ean, StringComparison.OrdinalIgnoreCase));
+            if (produto is null && itens is not null && !string.IsNullOrWhiteSpace(nomeProduto))
+            {
+                produto = itens
+                    .Select(x => (x, Score: NomeProdutoMatcher.Pontuar(nomeProduto, x.p.ProductName)))
+                    .Where(x => x.Score >= NomeProdutoMatcher.ScoreMinimo)
+                    .OrderByDescending(x => x.Score)
+                    .Select(x => ((VtexProduct p, VtexItem i)?)x.x)
+                    .FirstOrDefault();
+            }
 
             if (produto is null || produto.Value.i is null)
             {

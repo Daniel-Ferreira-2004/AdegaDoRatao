@@ -28,4 +28,7 @@ public interface IProductRepository : IRepository<Product>
 
     /// <summary>EANs (códigos de barras) dos produtos ativos que possuem EAN cadastrado.</summary>
     Task<IReadOnlyList<string>> ListarEansAtivosAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>Pares (EAN, Nome) dos produtos ativos com EAN — usado pelo agente de preços para buscar também pelo nome.</summary>
+    Task<IReadOnlyList<(string Ean, string Nome)>> ListarAtivosComEanAsync(CancellationToken cancellationToken = default);
 }

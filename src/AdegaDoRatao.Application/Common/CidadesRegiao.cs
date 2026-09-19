@@ -24,6 +24,10 @@ public static class CidadesRegiao
         ["suzano"] = (-23.5425, -46.3108),
         ["mogi das cruzes"] = (-23.5229, -46.1883),
         ["poa"] = (-23.5323, -46.3475),
+        ["guaianases"] = (-23.5436, -46.4097),
+        // Jardim Gianette é um bairro de Ferraz de Vasconcelos — usa as
+        // coordenadas do centro de Ferraz como aproximação.
+        ["gianette"] = (-23.5411, -46.3686),
         ["itaquaquecetuba"] = (-23.4861, -46.3483),
         ["arua"] = (-23.3969, -46.3208),
         ["guarulhos"] = (-23.4538, -46.5333),

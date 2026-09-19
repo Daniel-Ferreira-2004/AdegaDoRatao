@@ -179,7 +179,11 @@ public static class DependencyInjection
         services.Configure<GeocodingOptions>(
             configuration.GetSection(GeocodingOptions.SectionName));
 
-        services.AddHttpClient<IGeocodingService, NominatimGeocodingService>((serviceProvider, client) =>
+        // O provedor é escolhido por configuração (Geocoding:Provider):
+        //  - "Nominatim" (padrão): gratuito, sem chave;
+        //  - "Google": Google Maps Geocoding API — exige Geocoding:ApiKey
+        //    em User Secrets ou variável de ambiente (nunca no appsettings).
+        services.AddHttpClient<NominatimGeocodingService>((serviceProvider, client) =>
         {
             var options = serviceProvider
                 .GetRequiredService<Microsoft.Extensions.Options.IOptions<GeocodingOptions>>().Value;
@@ -187,18 +191,46 @@ public static class DependencyInjection
             client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         });
 
+        services.AddHttpClient<GoogleMapsGeocodingService>((serviceProvider, client) =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<Microsoft.Extensions.Options.IOptions<GeocodingOptions>>().Value;
+            client.BaseAddress = new Uri(options.GoogleBaseUrl.TrimEnd('/') + "/");
+            client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+        });
+
+        services.AddScoped<IGeocodingService>(serviceProvider =>
+        {
+            var options = serviceProvider
+                .GetRequiredService<Microsoft.Extensions.Options.IOptions<GeocodingOptions>>().Value;
+
+            return options.Provider.Equals("Google", StringComparison.OrdinalIgnoreCase)
+                ? serviceProvider.GetRequiredService<GoogleMapsGeocodingService>()
+                : (IGeocodingService)serviceProvider.GetRequiredService<NominatimGeocodingService>();
+        });
+
         // ============================================================
         // AGENTE DE PREÇOS — COLETORES POR REDE + JOB DIÁRIO
         // ============================================================
 
-        // Coletores rápidos (HTTP direto, sem navegador).
-        services.AddHttpClient<IPrecoRedeCollector, TendaPrecoCollector>(TendaPrecoCollectorSetup.Configurar);
-        services.AddHttpClient<IPrecoRedeCollector, AtacadaoPrecoCollector>(AtacadaoPrecoCollectorSetup.Configurar);
+        // Coletores rápidos (HTTP direto, sem navegador). Cada um é
+        // registrado como tipo CONCRETO com seu próprio HttpClient —
+        // registrar dois AddHttpClient<IPrecoRedeCollector, ...> faria a
+        // configuração do segundo sobrescrever a do primeiro (mesmo tipo
+        // de serviço), mandando o Tenda chamar a URL do Atacadão.
+        services.AddHttpClient<TendaPrecoCollector>(TendaPrecoCollectorSetup.Configurar);
+        services.AddHttpClient<AtacadaoPrecoCollector>(AtacadaoPrecoCollectorSetup.Configurar);
 
         // Coletores via Playwright (navegador real) — lentos, só no job diário.
         // Requer 'playwright install chromium' após o build (ver docs/19-AGENTE-PRECOS.md).
-        services.AddScoped<IPrecoRedeCollector, ShibataPrecoCollector>();
-        services.AddScoped<IPrecoRedeCollector, SondaPrecoCollector>();
+        services.AddScoped<ShibataPrecoCollector>();
+        services.AddScoped<SondaPrecoCollector>();
+
+        // Expõe todos como IPrecoRedeCollector para o IEnumerable<> do serviço.
+        services.AddScoped<IPrecoRedeCollector>(sp => sp.GetRequiredService<TendaPrecoCollector>());
+        services.AddScoped<IPrecoRedeCollector>(sp => sp.GetRequiredService<AtacadaoPrecoCollector>());
+        services.AddScoped<IPrecoRedeCollector>(sp => sp.GetRequiredService<ShibataPrecoCollector>());
+        services.AddScoped<IPrecoRedeCollector>(sp => sp.GetRequiredService<SondaPrecoCollector>());
 
         services.AddScoped<IAtualizadorPrecosRedesService, AtualizadorPrecosRedesService>();
         services.AddHostedService<AtualizadorPrecosRedesJob>();

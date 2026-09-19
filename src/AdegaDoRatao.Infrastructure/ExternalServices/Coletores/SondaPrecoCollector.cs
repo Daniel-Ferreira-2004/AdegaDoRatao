@@ -20,7 +20,7 @@ public sealed class SondaPrecoCollector(ILogger<SondaPrecoCollector> logger) : I
 {
     public string Rede => "Sonda";
 
-    public async Task<Result<ColetaPrecoRede>> ColetarAsync(string ean, CancellationToken cancellationToken = default)
+    public async Task<Result<ColetaPrecoRede>> ColetarAsync(string ean, string? nomeProduto = null, CancellationToken cancellationToken = default)
     {
         try
         {
@@ -31,8 +31,10 @@ public sealed class SondaPrecoCollector(ILogger<SondaPrecoCollector> logger) : I
             await page.GotoAsync("https://www.sondadelivery.com.br",
                 new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30000 });
 
-            // Preenche o campo de busca e submete.
-            await page.FillAsync(".txt-busca-nova", ean);
+            // Preenche o campo de busca e submete. Prefere o nome do
+            // produto — a busca do Sonda nem sempre indexa EAN.
+            var termo = string.IsNullOrWhiteSpace(nomeProduto) ? ean : nomeProduto;
+            await page.FillAsync(".txt-busca-nova", termo);
             await page.Keyboard.PressAsync("Enter");
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle,
                 new PageWaitForLoadStateOptions { Timeout = 30000 });
@@ -51,7 +53,7 @@ public sealed class SondaPrecoCollector(ILogger<SondaPrecoCollector> logger) : I
             return Result<ColetaPrecoRede>.Success(new ColetaPrecoRede(
                 Rede, null, preco, preco is not null));
         }
-        catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "Sonda: falha ao coletar o EAN {Ean} via Playwright.", ean);
             return Result<ColetaPrecoRede>.Failure("Falha ao consultar o site do Sonda.");

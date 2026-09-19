@@ -21,22 +21,28 @@ public sealed class AtualizadorPrecosRedesService(
 {
     public async Task<int> AtualizarTodosAsync(CancellationToken cancellationToken = default)
     {
-        var eans = await products.ListarEansAtivosAsync(cancellationToken);
-        foreach (var ean in eans)
+        var produtos = await products.ListarAtivosComEanAsync(cancellationToken);
+        foreach (var (ean, nome) in produtos)
         {
-            await AtualizarPorEanAsync(ean, cancellationToken);
+            await ColetarEmTodasAsRedesAsync(ean, nome, cancellationToken);
         }
 
-        return eans.Count;
+        return produtos.Count;
     }
 
     public async Task AtualizarPorEanAsync(string ean, CancellationToken cancellationToken = default)
+    {
+        var produto = await products.ObterPorCodigoDeBarrasAsync(ean, cancellationToken);
+        await ColetarEmTodasAsRedesAsync(ean, produto?.Name, cancellationToken);
+    }
+
+    private async Task ColetarEmTodasAsRedesAsync(string ean, string? nomeProduto, CancellationToken cancellationToken)
     {
         foreach (var coletor in coletores)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var resultado = await coletor.ColetarAsync(ean, cancellationToken);
+            var resultado = await coletor.ColetarAsync(ean, nomeProduto, cancellationToken);
             if (!resultado.Succeeded || resultado.Value is null)
             {
                 continue; // falha na rede: pula sem interromper as demais

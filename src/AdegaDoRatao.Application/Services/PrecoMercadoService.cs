@@ -34,10 +34,29 @@ public sealed class PrecoMercadoService : IPrecoMercadoService
         "extra", "semar", "veran", "d'avo", "davo", "assai", "soni"
     ];
 
+    // Cidades aceitas no retorno da comparação de preços: apenas lojas
+    // da região de atuação da adega. A comparação é por "contém", sem
+    // acentos e em minúsculas (ex.: "Poá" → "poa").
+    private static readonly string[] CidadesPermitidas =
+    [
+        "suzano", "poa", "ferraz de vasconcelos", "gianette", "guaianases"
+    ];
+
     private static bool RedePermitida(string rede)
     {
         var normalizado = Normalizar(rede);
         return RedesPermitidas.Any(normalizado.Contains);
+    }
+
+    private static bool CidadePermitida(string? cidade)
+    {
+        if (string.IsNullOrWhiteSpace(cidade))
+        {
+            return false;
+        }
+
+        var normalizado = Normalizar(cidade);
+        return CidadesPermitidas.Any(normalizado.Contains);
     }
 
     private static string Normalizar(string texto)
@@ -106,7 +125,7 @@ public sealed class PrecoMercadoService : IPrecoMercadoService
         // depois pelo menor preço; em empate de preço, o mais perto ganha.
         // Lojas sem preço vão para o final, da mais próxima à mais distante.
         var filtrados = resultado.Value!.Precos
-            .Where(p => RedePermitida(p.Rede))
+            .Where(p => RedePermitida(p.Rede) && CidadePermitida(p.Cidade))
             .Select(p => p with { DistanciaKm = CidadesRegiao.DistanciaDeFerrazKm(p.Cidade) })
             .OrderBy(p => p.Disponivel ? 0 : 1)
             .ThenBy(p => p.Preco ?? decimal.MaxValue)

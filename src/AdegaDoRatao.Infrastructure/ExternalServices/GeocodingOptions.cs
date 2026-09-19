@@ -14,8 +14,17 @@ public sealed class GeocodingOptions
 {
     public const string SectionName = "Geocoding";
 
+    /// <summary>
+    /// Provedor de geocodificação: "Nominatim" (padrão, gratuito) ou
+    /// "Google" (Google Maps Geocoding API — exige <see cref="ApiKey"/>).
+    /// </summary>
+    public string Provider { get; init; } = "Nominatim";
+
     /// <summary>URL base do serviço. Padrão: Nominatim público.</summary>
     public string BaseUrl { get; init; } = "https://nominatim.openstreetmap.org";
+
+    /// <summary>URL base do Google Maps Geocoding (usada quando Provider = "Google").</summary>
+    public string GoogleBaseUrl { get; init; } = "https://maps.googleapis.com";
 
     /// <summary>
     /// User-Agent enviado nas requisições. O Nominatim EXIGE um User-Agent

@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using AdegaDoRatao.Application.Common;
 using AdegaDoRatao.Application.Interfaces;
@@ -12,11 +11,13 @@ namespace AdegaDoRatao.Infrastructure.ExternalServices.Coletores;
 ///
 /// O site é Next.js e embute os resultados da busca no bloco
 /// &lt;script id="__NEXT_DATA__"&gt; da página /busca?q={termo}.
-/// O EAN não vem em campo próprio — aparece no nome do arquivo da imagem
-/// (thumbnail), ex.: ".../7894900027013_oficial-....jpg".
+/// A API VTEX pública NÃO está habilitada nesta conta (404), por isso
+/// a coleta é feita pelo HTML da página de busca.
 ///
-/// O preço exibido já considera a loja/região padrão do site; o CEP da
-/// adega (08503-000) é atendido pela loja de Guarulhos.
+/// A busca é feita pelo NOME do produto (mais confiável que EAN). O
+/// resultado é confirmado pelo EAN quando ele aparece na thumbnail do
+/// produto; senão, vale o candidato com melhor score de tokens
+/// (<see cref="NomeProdutoMatcher"/>).
 /// </summary>
 public sealed partial class TendaPrecoCollector(
     HttpClient http,
@@ -24,22 +25,22 @@ public sealed partial class TendaPrecoCollector(
 {
     public string Rede => "Tenda";
 
-    public async Task<Result<ColetaPrecoRede>> ColetarAsync(string ean, CancellationToken cancellationToken = default)
+    public async Task<Result<ColetaPrecoRede>> ColetarAsync(string ean, string? nomeProduto = null, CancellationToken cancellationToken = default)
     {
         try
         {
-            // Busca pelo próprio EAN — o Tenda indexa EANs na busca textual.
-            var html = await http.GetStringAsync($"busca?q={Uri.EscapeDataString(ean)}", cancellationToken);
+            var termo = string.IsNullOrWhiteSpace(nomeProduto) ? ean : nomeProduto;
+            var html = await http.GetStringAsync($"busca?q={Uri.EscapeDataString(termo)}", cancellationToken);
 
             var match = NextDataRegex().Match(html);
             if (!match.Success)
             {
-                logger.LogWarning("Tenda: bloco __NEXT_DATA__ não encontrado para o EAN {Ean}.", ean);
+                logger.LogWarning("Tenda: bloco __NEXT_DATA__ não encontrado para '{Termo}'.", termo);
                 return Result<ColetaPrecoRede>.Failure("Estrutura da página do Tenda não reconhecida.");
             }
 
             using var doc = JsonDocument.Parse(match.Groups[1].Value);
-            var produto = EncontrarProdutoPorEan(doc.RootElement, ean);
+            var produto = EncontrarProduto(doc.RootElement, ean, nomeProduto);
             if (produto is null)
             {
                 return Result<ColetaPrecoRede>.Success(
@@ -59,11 +60,14 @@ public sealed partial class TendaPrecoCollector(
         }
     }
 
-    private static (string Nome, decimal? Preco, bool Disponivel)? EncontrarProdutoPorEan(
-        JsonElement root, string ean)
+    private static (string Nome, decimal? Preco, bool Disponivel)? EncontrarProduto(
+        JsonElement root, string ean, string? nomeProduto)
     {
-        // Os produtos ficam em props.pageProps... — percorremos a árvore
-        // procurando objetos com "thumbnail" contendo o EAN.
+        // Percorre a árvore JSON procurando objetos de produto (com "name"
+        // e "price"). Prioridade: 1) EAN na thumbnail; 2) melhor score de
+        // tokens do nome; 3) nada → indisponível.
+        (string Nome, decimal? Preco, bool Disponivel)? melhor = null;
+        var melhorScore = 0.0;
         var stack = new Stack<JsonElement>();
         stack.Push(root);
 
@@ -73,21 +77,31 @@ public sealed partial class TendaPrecoCollector(
             switch (atual.ValueKind)
             {
                 case JsonValueKind.Object:
-                    if (atual.TryGetProperty("thumbnail", out var thumb)
-                        && thumb.ValueKind == JsonValueKind.String
-                        && (thumb.GetString()?.Contains(ean) ?? false))
+                    if (atual.TryGetProperty("name", out var n)
+                        && atual.TryGetProperty("price", out var p)
+                        && p.ValueKind == JsonValueKind.Number)
                     {
-                        var nome = atual.TryGetProperty("name", out var n) ? n.GetString() : null;
-                        decimal? preco = null;
-                        if (atual.TryGetProperty("price", out var p) && p.ValueKind == JsonValueKind.Number)
-                        {
-                            preco = p.GetDecimal();
-                        }
-
+                        var nome = n.GetString() ?? string.Empty;
+                        var preco = p.GetDecimal();
                         var disponivel = atual.TryGetProperty("isAvailable", out var a)
                             && a.ValueKind == JsonValueKind.True;
+                        var candidato = (nome, (decimal?)preco, disponivel);
 
-                        return (nome ?? string.Empty, preco, disponivel && preco is not null);
+                        var thumbConfirma = atual.TryGetProperty("thumbnail", out var thumb)
+                            && thumb.ValueKind == JsonValueKind.String
+                            && (thumb.GetString()?.Contains(ean) ?? false);
+
+                        if (thumbConfirma)
+                        {
+                            return candidato;
+                        }
+
+                        var score = NomeProdutoMatcher.Pontuar(nomeProduto, nome);
+                        if (score >= NomeProdutoMatcher.ScoreMinimo && score > melhorScore)
+                        {
+                            melhor = candidato;
+                            melhorScore = score;
+                        }
                     }
 
                     foreach (var prop in atual.EnumerateObject())
@@ -105,7 +119,7 @@ public sealed partial class TendaPrecoCollector(
             }
         }
 
-        return null;
+        return melhor;
     }
 
     [GeneratedRegex("<script id=\"__NEXT_DATA__\" type=\"application/json\">(.*?)</script>", RegexOptions.Singleline)]
@@ -119,6 +133,7 @@ public static class TendaPrecoCollectorSetup
     {
         client.BaseAddress = new Uri("https://www.tendaatacado.com.br/");
         client.Timeout = TimeSpan.FromSeconds(20);
+        // User-Agent de navegador para não ser bloqueado.
         client.DefaultRequestHeaders.UserAgent.ParseAdd(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36");
     }

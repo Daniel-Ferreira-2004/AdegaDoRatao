@@ -20,10 +20,14 @@ public interface IPrecoRedeCollector
     string Rede { get; }
 
     /// <summary>
-    /// Consulta o preço de um EAN na rede. Retorna Failure quando a coleta
-    /// falhou (timeout, bloqueio, mudança de layout) — nunca lança exceção.
+    /// Consulta o preço de um produto na rede. A busca é feita pelo
+    /// <paramref name="nomeProduto"/> quando informado (muitos sites não
+    /// indexam EAN na busca textual); o <paramref name="ean"/> é usado
+    /// para confirmar que o resultado é o produto certo, quando o site
+    /// expõe o EAN. Retorna Failure quando a coleta falhou (timeout,
+    /// bloqueio, mudança de layout) — nunca lança exceção.
     /// </summary>
-    Task<Result<ColetaPrecoRede>> ColetarAsync(string ean, CancellationToken cancellationToken = default);
+    Task<Result<ColetaPrecoRede>> ColetarAsync(string ean, string? nomeProduto = null, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
