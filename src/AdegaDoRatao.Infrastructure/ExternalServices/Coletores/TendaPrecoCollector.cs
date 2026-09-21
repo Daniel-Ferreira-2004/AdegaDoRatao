@@ -47,11 +47,17 @@ public sealed partial class TendaPrecoCollector(
                     new ColetaPrecoRede(Rede, null, null, Disponivel: false));
             }
 
+            // Se o JSON não trouxe a URL do produto, usa a página de busca
+            // como fallback (o usuário ainda vê o produto no site).
+            var url = produto.Value.Url
+                ?? $"https://www.tendaatacado.com.br/busca?q={Uri.EscapeDataString(termo)}";
+
             return Result<ColetaPrecoRede>.Success(new ColetaPrecoRede(
                 Rede,
                 produto.Value.Nome,
                 produto.Value.Preco,
-                produto.Value.Disponivel));
+                produto.Value.Disponivel,
+                url));
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
         {
@@ -60,13 +66,13 @@ public sealed partial class TendaPrecoCollector(
         }
     }
 
-    private static (string Nome, decimal? Preco, bool Disponivel)? EncontrarProduto(
+    private static (string Nome, decimal? Preco, bool Disponivel, string? Url)? EncontrarProduto(
         JsonElement root, string ean, string? nomeProduto)
     {
         // Percorre a árvore JSON procurando objetos de produto (com "name"
         // e "price"). Prioridade: 1) EAN na thumbnail; 2) melhor score de
         // tokens do nome; 3) nada → indisponível.
-        (string Nome, decimal? Preco, bool Disponivel)? melhor = null;
+        (string Nome, decimal? Preco, bool Disponivel, string? Url)? melhor = null;
         var melhorScore = 0.0;
         var stack = new Stack<JsonElement>();
         stack.Push(root);
@@ -85,7 +91,20 @@ public sealed partial class TendaPrecoCollector(
                         var preco = p.GetDecimal();
                         var disponivel = atual.TryGetProperty("isAvailable", out var a)
                             && a.ValueKind == JsonValueKind.True;
-                        var candidato = (nome, (decimal?)preco, disponivel);
+
+                        // URL do produto: o Next.js costuma expor "url" ou
+                        // "slug" no objeto do produto.
+                        string? url = null;
+                        if (atual.TryGetProperty("url", out var u) && u.ValueKind == JsonValueKind.String)
+                        {
+                            url = u.GetString();
+                        }
+                        else if (atual.TryGetProperty("slug", out var s) && s.ValueKind == JsonValueKind.String)
+                        {
+                            url = $"https://www.tendaatacado.com.br/produto/{s.GetString()}";
+                        }
+
+                        var candidato = (nome, (decimal?)preco, disponivel, url);
 
                         var thumbConfirma = atual.TryGetProperty("thumbnail", out var thumb)
                             && thumb.ValueKind == JsonValueKind.String

@@ -37,32 +37,63 @@ public sealed partial class ShibataPrecoCollector(ILogger<ShibataPrecoCollector>
             await page.GotoAsync("https://www.loja.shibata.com.br/",
                 new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 30000 });
 
+            // Fecha o modal de cookies/boas-vindas se aparecer.
+            try
+            {
+                await page.ClickAsync("button:has-text('Fechar modal')", new PageClickOptions { Timeout = 3000 });
+            }
+            catch (TimeoutException) { /* sem modal */ }
+
             // Aguarda o SPA renderizar o campo de busca.
-            var campo = page.Locator("input[placeholder*='O que você precisa'], input[type='search'], input[placeholder*='busca' i]").First;
+            var campo = page.Locator("#search-term, input[placeholder*='O que você precisa']").First;
             await campo.WaitForAsync(new LocatorWaitForOptions { Timeout = 15000 });
 
             var termo = string.IsNullOrWhiteSpace(nomeProduto) ? ean : nomeProduto;
-            await campo.FillAsync(termo);
 
-            // Aguarda o dropdown de autocomplete renderizar os produtos.
-            // Se não aparecer nada em 10s, segue com lista vazia (o
-            // EvaluateAsync abaixo devolve null nesse caso).
+            // Clica no campo e digita tecla por tecla — o autocomplete
+            // Angular só dispara com eventos de teclado reais, não com
+            // FillAsync programático.
+            await campo.ClickAsync();
+            await campo.PressSequentiallyAsync(termo, new LocatorPressSequentiallyOptions { Delay = 80 });
+
+            // Aguarda o DROPDOWN do autocomplete (nav "Menu de busca").
+            // Não usar 'a[href*=/produto/]' sozinho: a home já tem links
+            // de produto nos carrosséis, o que faria o coletor ler os
+            // produtos errados (ex.: "Tamanho de Fralda").
             try
             {
-                await page.WaitForSelectorAsync("a[href*='/produto/']",
-                    new PageWaitForSelectorOptions { Timeout = 10000 });
+                await page.WaitForSelectorAsync("nav:has-text('Menu de busca') a[href*='/produto/'], nav[aria-label='Menu de busca'] a[href*='/produto/']",
+                    new PageWaitForSelectorOptions { Timeout = 12000 });
             }
             catch (TimeoutException)
             {
-                // sem resultados no autocomplete — tratado abaixo
+                logger.LogWarning("Shibata: autocomplete não retornou produtos para '{Termo}'.", termo);
             }
 
-            var itens = await page.EvaluateAsync<List<ProdutoShibata>>(
-                @"() => [...document.querySelectorAll('a[href*=""/produto/""]')].map(a => {
-                    const nome = a.querySelector('p')?.textContent?.trim() ?? '';
-                    const m = a.innerText.match(/R\$\s*([\d.,]+)/);
-                    return { nome, preco: m ? m[1] : null };
-                }).filter(x => x.nome.length > 0)") ?? [];
+            // Retorna JSON string e desserializa com System.Text.Json —
+            // o conversor do Playwright quebra (NRE) quando o JS devolve
+            // objetos com propriedades null.
+            // Lê APENAS os links dentro do dropdown do autocomplete (nav
+            // "Menu de busca"), nunca os carrosséis da home.
+            var json = await page.EvaluateAsync<string>(
+                @"() => {
+                    const nav = document.querySelector('nav[aria-label=""Menu de busca""]')
+                        ?? [...document.querySelectorAll('nav')].find(n => n.textContent.includes('Produtos'));
+                    if (!nav) return '[]';
+                    return JSON.stringify([...nav.querySelectorAll('a[href*=""/produto/""]')].map(a => {
+                        const nome = a.querySelector('p')?.textContent?.trim() ?? '';
+                        const m = a.innerText.match(/R\$\s*([\d.,]+)/);
+                        return { nome, preco: m ? m[1] : null, url: a.getAttribute('href') };
+                    }).filter(x => x.nome.length > 0));
+                }");
+
+            var itens = string.IsNullOrWhiteSpace(json)
+                ? []
+                : System.Text.Json.JsonSerializer.Deserialize<List<ProdutoShibata>>(json) ?? [];
+
+            logger.LogInformation("Shibata: {Total} produtos no autocomplete para '{Termo}': {Itens}",
+                itens.Count, termo,
+                string.Join(" | ", itens.Select(x => $"{x.Nome} [{x.Preco}]")));
 
             if (itens.Count == 0)
             {
@@ -71,8 +102,16 @@ public sealed partial class ShibataPrecoCollector(ILogger<ShibataPrecoCollector>
             }
 
             // Escolhe o produto com melhor score de tokens.
-            var melhor = itens
+            var pontuados = itens
                 .Select(x => (Item: x, Score: NomeProdutoMatcher.Pontuar(termo, x.Nome)))
+                .ToList();
+
+            foreach (var p in pontuados)
+            {
+                logger.LogInformation("Shibata: score {Score:F2} para '{Nome}'", p.Score, p.Item.Nome);
+            }
+
+            var melhor = pontuados
                 .Where(x => x.Score >= NomeProdutoMatcher.ScoreMinimo)
                 .OrderByDescending(x => x.Score)
                 .FirstOrDefault();
@@ -84,8 +123,11 @@ public sealed partial class ShibataPrecoCollector(ILogger<ShibataPrecoCollector>
             }
 
             var preco = ParsePreco(melhor.Item.Preco);
+            var url = melhor.Item.Url is not null
+                ? new Uri(new Uri("https://www.loja.shibata.com.br"), melhor.Item.Url).ToString()
+                : null;
             return Result<ColetaPrecoRede>.Success(new ColetaPrecoRede(
-                Rede, melhor.Item.Nome, preco, preco is not null));
+                Rede, melhor.Item.Nome, preco, preco is not null, url));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -114,5 +156,8 @@ public sealed partial class ShibataPrecoCollector(ILogger<ShibataPrecoCollector>
 
         [System.Text.Json.Serialization.JsonPropertyName("preco")]
         public string? Preco { get; set; }
+
+        [System.Text.Json.Serialization.JsonPropertyName("url")]
+        public string? Url { get; set; }
     }
 }

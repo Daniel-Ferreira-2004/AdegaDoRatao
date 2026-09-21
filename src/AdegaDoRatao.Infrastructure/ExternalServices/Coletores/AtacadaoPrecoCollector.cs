@@ -23,33 +23,57 @@ public sealed class AtacadaoPrecoCollector(
 {
     public string Rede => "Atacadão";
 
+    // Canais de venda (sales channels) consultados — cada sc é uma loja.
+    // O estoque/preço varia por loja, então consultamos todos e
+    // preferimos o item DISPONÍVEL.
+    private static readonly int[] SalesChannels = [1, 2];
+
     public async Task<Result<ColetaPrecoRede>> ColetarAsync(string ean, string? nomeProduto = null, CancellationToken cancellationToken = default)
     {
         try
         {
             // Prefere o nome do produto (a VTEX nem sempre indexa EAN na
             // busca textual); cai para o EAN quando não há nome.
-            // sc=2: canal de vendas da loja física da região — sem ele a
-            // VTEX retorna Price=0 e AvailableQuantity=0 (sem estoque).
             var termo = string.IsNullOrWhiteSpace(nomeProduto) ? ean : nomeProduto;
-            var produtos = await http.GetFromJsonAsync<List<VtexProduct>>(
-                $"io/api/catalog_system/pub/products/search?ft={Uri.EscapeDataString(termo)}&_from=0&_to=5&sc=2",
-                cancellationToken);
 
-            var itens = produtos?.SelectMany(p => p.Items ?? [], (p, i) => (p, i)).ToList();
+            // Consulta todos os canais e junta os itens.
+            var itens = new List<(VtexProduct p, VtexItem i)>();
+            foreach (var sc in SalesChannels)
+            {
+                var produtos = await http.GetFromJsonAsync<List<VtexProduct>>(
+                    $"io/api/catalog_system/pub/products/search?ft={Uri.EscapeDataString(termo)}&_from=0&_to=5&sc={sc}",
+                    cancellationToken);
+                if (produtos is not null)
+                {
+                    itens.AddRange(produtos.SelectMany(p => p.Items ?? [], (p, i) => (p, i)));
+                }
+            }
 
-            // 1) Confirma pelo EAN quando o item o expõe.
+            // 1) Confirma pelo EAN quando o item o expõe — preferindo o
+            //    que está disponível (com preço e estoque).
             // 2) Senão, escolhe o resultado cujo nome melhor casa com o
-            //    termo buscado (tokens: "doritos" + "120" etc.), exigindo
-            //    score mínimo para não trazer produto errado.
-            (VtexProduct p, VtexItem i)? produto = itens?
-                .FirstOrDefault(x => string.Equals(x.i.Ean, ean, StringComparison.OrdinalIgnoreCase));
-            if (produto is null && itens is not null && !string.IsNullOrWhiteSpace(nomeProduto))
+            //    termo buscado (tokens: "doritos" + "120" etc.), também
+            //    preferindo o disponível.
+            static bool Disponivel((VtexProduct p, VtexItem i) x)
+            {
+                var o = x.i.Sellers?.FirstOrDefault()?.Offer;
+                return o is { AvailableQuantity: > 0 } && o.Price is > 0;
+            }
+
+            var porEan = itens
+                .Where(x => string.Equals(x.i.Ean, ean, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(Disponivel)
+                .ToList();
+
+            (VtexProduct p, VtexItem i)? produto = porEan.Count > 0 ? porEan[0] : null;
+
+            if (produto is null && itens.Count > 0 && !string.IsNullOrWhiteSpace(nomeProduto))
             {
                 produto = itens
                     .Select(x => (x, Score: NomeProdutoMatcher.Pontuar(nomeProduto, x.p.ProductName)))
                     .Where(x => x.Score >= NomeProdutoMatcher.ScoreMinimo)
-                    .OrderByDescending(x => x.Score)
+                    .OrderByDescending(x => Disponivel(x.x))
+                    .ThenByDescending(x => x.Score)
                     .Select(x => ((VtexProduct p, VtexItem i)?)x.x)
                     .FirstOrDefault();
             }
@@ -65,8 +89,13 @@ public sealed class AtacadaoPrecoCollector(
             var preco = oferta?.Price is > 0 ? oferta.Price : null;
             var disponivel = oferta is { AvailableQuantity: > 0 } && preco is not null;
 
+            // A VTEX expõe o link relativo do produto no campo "link".
+            var url = encontrado.p.Link is not null
+                ? $"https://www.atacadao.com.br{encontrado.p.Link}"
+                : null;
+
             return Result<ColetaPrecoRede>.Success(new ColetaPrecoRede(
-                Rede, encontrado.p.ProductName, preco, disponivel));
+                Rede, encontrado.p.ProductName, preco, disponivel, url));
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
         {
@@ -77,6 +106,7 @@ public sealed class AtacadaoPrecoCollector(
 
     private sealed record VtexProduct(
         [property: JsonPropertyName("productName")] string? ProductName,
+        [property: JsonPropertyName("link")] string? Link,
         [property: JsonPropertyName("items")] List<VtexItem>? Items);
 
     private sealed record VtexItem(
@@ -102,5 +132,8 @@ public static class AtacadaoPrecoCollectorSetup
         client.DefaultRequestHeaders.UserAgent.ParseAdd(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36");
         client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+        // Regionalização VTEX: CEP da adega (Ferraz de Vasconcelos) — sem
+        // esses cookies a API retorna preço/estoque da loja errada.
+        client.DefaultRequestHeaders.Add("Cookie", "postalCode=08503-000; region=08503000");
     }
 }

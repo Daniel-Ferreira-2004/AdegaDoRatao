@@ -48,7 +48,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (permission: string) => {
       if (!session) return false
       if (session.role === 'ADMIN') return true
-      return session.permissions.includes(permission)
+      // Sessões antigas (salvas antes de o login retornar permissions)
+      // podem não ter o array — trata como vazio em vez de quebrar.
+      return (session.permissions ?? []).includes(permission)
     },
     [session],
   )

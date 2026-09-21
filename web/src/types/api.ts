@@ -94,6 +94,7 @@ export interface PrecoMercadoRedeResponse {
   disponivel: boolean
   mensagem: string | null
   distanciaKm: number | null
+  urlProduto: string | null
 }
 
 export interface PrecoMercadoResponse {

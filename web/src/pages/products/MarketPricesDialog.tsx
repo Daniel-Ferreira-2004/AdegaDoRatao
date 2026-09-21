@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { TrendingDown, MapPin, RefreshCw } from 'lucide-react'
+import { TrendingDown, MapPin, RefreshCw, ExternalLink } from 'lucide-react'
 import { getPrecosMercado } from '@/services/products/productsService'
 import type { PrecoMercadoRedeResponse, ProductResponse } from '@/types/api'
 import { formatCurrency } from '@/utils/format'
@@ -104,7 +104,7 @@ export function MarketPricesDialog({ open, onOpenChange, product }: MarketPrices
                         </p>
                       )}
                     </div>
-                    <div className="text-right">
+                    <div className="flex items-center gap-2 text-right">
                       {item.disponivel && item.preco !== null ? (
                         <span className={`font-semibold ${isMenor ? 'text-green-600' : ''}`}>
                           {formatCurrency(item.preco)}
@@ -113,6 +113,17 @@ export function MarketPricesDialog({ open, onOpenChange, product }: MarketPrices
                         <span className="text-sm text-muted-foreground">
                           {item.mensagem ?? 'Indisponível'}
                         </span>
+                      )}
+                      {item.urlProduto && (
+                        <a
+                          href={item.urlProduto}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={`Ver produto no site do ${item.rede}`}
+                          className="text-muted-foreground transition-colors hover:text-primary"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </a>
                       )}
                     </div>
                   </li>

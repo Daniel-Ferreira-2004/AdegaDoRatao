@@ -53,11 +53,12 @@ public sealed class AtualizadorPrecosRedesService(
             if (existente is null)
             {
                 await snapshots.AdicionarAsync(new MarketPriceSnapshot(
-                    ean, coletor.Rede, coleta.NomeProdutoNaRede, coleta.Preco, coleta.Disponivel), cancellationToken);
+                    ean, coletor.Rede, coleta.NomeProdutoNaRede, coleta.Preco, coleta.Disponivel,
+                    coleta.UrlProduto), cancellationToken);
             }
             else
             {
-                existente.Atualizar(coleta.Preco, coleta.Disponivel, coleta.NomeProdutoNaRede);
+                existente.Atualizar(coleta.Preco, coleta.Disponivel, coleta.NomeProdutoNaRede, coleta.UrlProduto);
                 snapshots.Atualizar(existente);
             }
         }

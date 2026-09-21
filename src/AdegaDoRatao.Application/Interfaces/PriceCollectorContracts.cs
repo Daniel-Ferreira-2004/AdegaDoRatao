@@ -7,7 +7,8 @@ public sealed record ColetaPrecoRede(
     string Rede,
     string? NomeProdutoNaRede,
     decimal? Preco,
-    bool Disponivel);
+    bool Disponivel,
+    string? UrlProduto = null);
 
 /// <summary>
 /// Porta de saída para um coletor de preços de uma rede específica

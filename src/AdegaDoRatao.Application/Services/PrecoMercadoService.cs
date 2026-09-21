@@ -95,11 +95,16 @@ public sealed class PrecoMercadoService : IPrecoMercadoService
         var locais = await _snapshots.ListarPorEanAsync(produto.Barcode, cancellationToken);
         if (locais.Count > 0)
         {
+            // Se há preço coletado, o produto ESTÁ disponível na rede —
+            // alguns sites marcam isAvailable=false mesmo exibindo preço
+            // (variação por loja), então o preço prevalece.
             var itens = locais
                 .Select(s => new PrecoMercadoRedeResponse(
-                    s.Rede, null, s.Preco, s.Disponivel,
-                    s.Disponivel ? null : "Produto indisponível nesta rede.",
-                    DistanciaKm: null))
+                    s.Rede, null, s.Preco,
+                    s.Disponivel || s.Preco is not null,
+                    s.Disponivel || s.Preco is not null ? null : "Produto indisponível nesta rede.",
+                    DistanciaKm: null,
+                    UrlProduto: s.UrlProduto))
                 .OrderBy(p => p.Disponivel ? 0 : 1)
                 .ThenBy(p => p.Preco ?? decimal.MaxValue)
                 .ToArray();

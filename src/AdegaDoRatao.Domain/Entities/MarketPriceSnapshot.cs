@@ -17,12 +17,15 @@ public class MarketPriceSnapshot : BaseEntity
     public bool Disponivel { get; private set; }
     public DateTime ColetadoEm { get; private set; }
 
+    /// <summary>URL da página do produto no site da rede (para o botão "Ver no site").</summary>
+    public string? UrlProduto { get; private set; }
+
     private MarketPriceSnapshot()
     {
     }
 
     public MarketPriceSnapshot(string ean, string rede, string? nomeProdutoNaRede,
-        decimal? preco, bool disponivel)
+        decimal? preco, bool disponivel, string? urlProduto = null)
     {
         if (string.IsNullOrWhiteSpace(ean))
         {
@@ -39,14 +42,16 @@ public class MarketPriceSnapshot : BaseEntity
         NomeProdutoNaRede = string.IsNullOrWhiteSpace(nomeProdutoNaRede) ? null : nomeProdutoNaRede.Trim();
         Preco = preco;
         Disponivel = disponivel;
+        UrlProduto = string.IsNullOrWhiteSpace(urlProduto) ? null : urlProduto.Trim();
         ColetadoEm = DateTime.UtcNow;
     }
 
-    public void Atualizar(decimal? preco, bool disponivel, string? nomeProdutoNaRede)
+    public void Atualizar(decimal? preco, bool disponivel, string? nomeProdutoNaRede, string? urlProduto = null)
     {
         Preco = preco;
         Disponivel = disponivel;
         NomeProdutoNaRede = string.IsNullOrWhiteSpace(nomeProdutoNaRede) ? NomeProdutoNaRede : nomeProdutoNaRede.Trim();
+        UrlProduto = string.IsNullOrWhiteSpace(urlProduto) ? UrlProduto : urlProduto.Trim();
         ColetadoEm = DateTime.UtcNow;
         MarcarComoAtualizada();
     }
