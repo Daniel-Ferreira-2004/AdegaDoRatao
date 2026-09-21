@@ -1,10 +1,10 @@
 namespace AdegaDoRatao.Application.DTOs;
 
-public sealed record CreateProductRequest(string Name, string? Description, string Sku, string? Barcode,
+public sealed record CreateProductRequest(string Name, string? Description, string Barcode,
     Guid CategoryId, Guid BrandId, string UnitOfMeasure, decimal CostPrice, decimal SalePrice,
     int MinStock, int? MaxStock, bool AllowNegativeStock = false);
 
-public sealed record UpdateProductRequest(string Name, string? Description, string? Barcode, Guid CategoryId, Guid BrandId,
+public sealed record UpdateProductRequest(string Name, string? Description, string Barcode, Guid CategoryId, Guid BrandId,
     string UnitOfMeasure, int MinStock, int? MaxStock, bool AllowNegativeStock);
 
 public sealed record ChangeProductPricesRequest(decimal CostPrice, decimal SalePrice);

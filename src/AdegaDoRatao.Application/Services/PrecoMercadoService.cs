@@ -1,6 +1,7 @@
 using AdegaDoRatao.Application.Common;
 using AdegaDoRatao.Application.DTOs;
 using AdegaDoRatao.Application.Interfaces;
+using AdegaDoRatao.Domain.Entities;
 using AdegaDoRatao.Domain.Interfaces;
 
 namespace AdegaDoRatao.Application.Services;
@@ -59,6 +60,19 @@ public sealed class PrecoMercadoService : IPrecoMercadoService
         return CidadesPermitidas.Any(normalizado.Contains);
     }
 
+    /// <summary>
+    /// Mensagem específica de indisponibilidade conforme o que o coletor
+    /// conseguiu apurar: produto encontrado sem preço (provável falta de
+    /// estoque) vs. produto não encontrado na busca da rede.
+    /// </summary>
+    private static string MensagemIndisponibilidade(MarketPriceSnapshot s)
+        => (s.UrlProduto is not null, s.Preco is not null) switch
+        {
+            (true, false) => "Sem preço no site (provável falta de estoque).",
+            (false, false) => "Não encontrado nesta rede.",
+            _ => "Indisponível nesta rede."
+        };
+
     private static string Normalizar(string texto)
     {
         var decomposto = texto.ToLowerInvariant().Normalize(System.Text.NormalizationForm.FormD);
@@ -102,7 +116,7 @@ public sealed class PrecoMercadoService : IPrecoMercadoService
                 .Select(s => new PrecoMercadoRedeResponse(
                     s.Rede, null, s.Preco,
                     s.Disponivel || s.Preco is not null,
-                    s.Disponivel || s.Preco is not null ? null : "Produto indisponível nesta rede.",
+                    s.Disponivel || s.Preco is not null ? null : MensagemIndisponibilidade(s),
                     DistanciaKm: null,
                     UrlProduto: s.UrlProduto))
                 .OrderBy(p => p.Disponivel ? 0 : 1)

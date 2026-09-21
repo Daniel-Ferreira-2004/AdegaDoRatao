@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { TrendingDown, MapPin, RefreshCw, ExternalLink } from 'lucide-react'
-import { getPrecosMercado } from '@/services/products/productsService'
+import { atualizarPrecosMercado, getPrecosMercado } from '@/services/products/productsService'
+import { useToast } from '@/components/feedback/toast'
 import type { PrecoMercadoRedeResponse, ProductResponse } from '@/types/api'
 import { formatCurrency } from '@/utils/format'
 import { Badge } from '@/components/ui/badge'
@@ -38,11 +39,25 @@ function ordenar(precos: PrecoMercadoRedeResponse[]): PrecoMercadoRedeResponse[]
 }
 
 export function MarketPricesDialog({ open, onOpenChange, product }: MarketPricesDialogProps) {
+  const { toast } = useToast()
   const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['precos-mercado', product?.id],
     queryFn: () => getPrecosMercado(product!.id),
     enabled: open && product !== null,
     staleTime: 5 * 60 * 1000, // evita reconsulta ao reabrir (o backend já cacheia 6h)
+  })
+
+  // Dispara a coleta do EAN nas redes (POST /precos/atualizar/{ean}) e
+  // depois relê os preços já atualizados.
+  const ean = data?.ean ?? product?.barcode ?? null
+  const atualizar = useMutation({
+    mutationFn: () => atualizarPrecosMercado(ean!),
+    onSuccess: async () => {
+      await refetch()
+      toast({ variant: 'success', title: 'Preços atualizados nas redes.' })
+    },
+    onError: (error: Error) =>
+      toast({ variant: 'error', title: 'Não foi possível atualizar os preços.', description: error.message }),
   })
 
   const precosOrdenados = useMemo(() => (data ? ordenar(data.precos) : []), [data])
@@ -140,12 +155,12 @@ export function MarketPricesDialog({ open, onOpenChange, product }: MarketPrices
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => refetch()}
-                disabled={isFetching}
+                onClick={() => atualizar.mutate()}
+                disabled={isFetching || atualizar.isPending || !ean}
                 aria-label="Atualizar preços"
               >
-                <RefreshCw className={isFetching ? 'animate-spin' : ''} />
-                Atualizar
+                <RefreshCw className={isFetching || atualizar.isPending ? 'animate-spin' : ''} />
+                {atualizar.isPending ? 'Coletando...' : 'Atualizar'}
               </Button>
             </div>
           </>

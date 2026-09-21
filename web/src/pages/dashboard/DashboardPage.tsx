@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import {
   DollarSign,
   ShoppingCart,
@@ -56,14 +57,14 @@ export default function DashboardPage() {
   const summary = data?.summary
 
   const cards = [
-    { title: 'Vendas hoje', value: summary?.vendasHoje, icon: ShoppingCart, format: (v: number) => String(v) },
-    { title: 'Faturamento hoje', value: summary?.faturamentoHoje, icon: DollarSign, format: formatCurrency },
-    { title: 'Faturamento no mês', value: summary?.faturamentoMes, icon: TrendingUp, format: formatCurrency },
-    { title: 'Despesas no mês', value: summary?.despesasMes, icon: Receipt, format: formatCurrency },
-    { title: 'Saldo do mês', value: summary?.saldoMes, icon: Wallet, format: formatCurrency },
-    { title: 'Lucro bruto estimado (mês)', value: summary?.lucroBrutoEstimadoMes, icon: PiggyBank, format: formatCurrency },
-    { title: 'Produtos com estoque baixo', value: summary?.produtosEstoqueBaixo, icon: AlertTriangle, format: (v: number) => String(v) },
-    { title: 'Produtos sem estoque', value: summary?.produtosSemEstoque, icon: PackageX, format: (v: number) => String(v) },
+    { title: 'Vendas hoje', value: summary?.vendasHoje, icon: ShoppingCart, format: (v: number) => String(v), to: '/vendas' },
+    { title: 'Faturamento hoje', value: summary?.faturamentoHoje, icon: DollarSign, format: formatCurrency, to: '/vendas' },
+    { title: 'Faturamento no mês', value: summary?.faturamentoMes, icon: TrendingUp, format: formatCurrency, to: '/vendas' },
+    { title: 'Despesas no mês', value: summary?.despesasMes, icon: Receipt, format: formatCurrency, to: '/financeiro' },
+    { title: 'Saldo do mês', value: summary?.saldoMes, icon: Wallet, format: formatCurrency, to: '/financeiro/fluxo-de-caixa' },
+    { title: 'Lucro bruto estimado (mês)', value: summary?.lucroBrutoEstimadoMes, icon: PiggyBank, format: formatCurrency, to: '/financeiro/fluxo-de-caixa' },
+    { title: 'Produtos com estoque baixo', value: summary?.produtosEstoqueBaixo, icon: AlertTriangle, format: (v: number) => String(v), to: '/estoque' },
+    { title: 'Produtos sem estoque', value: summary?.produtosSemEstoque, icon: PackageX, format: (v: number) => String(v), to: '/estoque' },
   ]
 
   return (
@@ -72,19 +73,21 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
-          <Card key={card.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
-              <card.icon className="size-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <Skeleton className="h-8 w-24" />
-              ) : (
-                <p className="text-2xl font-bold">{card.format(card.value ?? 0)}</p>
-              )}
-            </CardContent>
-          </Card>
+          <Link key={card.title} to={card.to} className="block">
+            <Card className="h-full transition-colors hover:border-primary/50 hover:bg-accent/50">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
+                <card.icon className="size-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <p className="text-2xl font-bold">{card.format(card.value ?? 0)}</p>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
         ))}
       </div>
 

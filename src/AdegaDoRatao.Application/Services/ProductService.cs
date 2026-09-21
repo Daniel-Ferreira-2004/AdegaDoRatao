@@ -22,13 +22,12 @@ public sealed class ProductService : IProductService
 
     public async Task<ProductResponse> CreateAsync(CreateProductRequest request, CancellationToken cancellationToken = default)
     {
-        if (await _products.SkuJaExisteAsync(request.Sku, null, cancellationToken))
-            throw new UseCaseException("Já existe um produto cadastrado com este SKU.");
-        if (!string.IsNullOrWhiteSpace(request.Barcode) && await _products.CodigoDeBarrasJaExisteAsync(request.Barcode, null, cancellationToken))
+        // O SKU é sempre igual ao código de barras (EAN): uma única checagem de unicidade cobre ambos.
+        if (await _products.CodigoDeBarrasJaExisteAsync(request.Barcode, null, cancellationToken))
             throw new UseCaseException("Já existe um produto cadastrado com este código de barras.");
 
         await EnsureCatalogAsync(request.CategoryId, request.BrandId, cancellationToken);
-        var product = new Product(request.Name, request.Description, request.Sku, request.Barcode, request.CategoryId,
+        var product = new Product(request.Name, request.Description, request.Barcode, request.Barcode, request.CategoryId,
             request.BrandId, request.UnitOfMeasure, request.CostPrice, request.SalePrice, request.MinStock,
             request.MaxStock, request.AllowNegativeStock);
         await _products.AdicionarAsync(product, cancellationToken);
@@ -53,7 +52,7 @@ public sealed class ProductService : IProductService
     public async Task<ProductResponse> UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken cancellationToken = default)
     {
         var product = await GetRequiredAsync(id, cancellationToken);
-        if (!string.IsNullOrWhiteSpace(request.Barcode) && await _products.CodigoDeBarrasJaExisteAsync(request.Barcode, id, cancellationToken))
+        if (await _products.CodigoDeBarrasJaExisteAsync(request.Barcode, id, cancellationToken))
             throw new UseCaseException("Já existe um produto cadastrado com este código de barras.");
         await EnsureCatalogAsync(request.CategoryId, request.BrandId, cancellationToken);
         product.AtualizarDadosCadastrais(request.Name, request.Description, request.UnitOfMeasure, request.CategoryId, request.BrandId);

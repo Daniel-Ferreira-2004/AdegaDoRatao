@@ -112,12 +112,15 @@ public sealed partial class ShibataPrecoCollector(ILogger<ShibataPrecoCollector>
             }
 
             var melhor = pontuados
-                .Where(x => x.Score >= NomeProdutoMatcher.ScoreMinimo)
+                .Where(x => x.Score >= NomeProdutoMatcher.ScoreMinimo
+                    && NomeProdutoMatcher.ContemTokensObrigatorios(termo, x.Item.Nome))
                 .OrderByDescending(x => x.Score)
                 .FirstOrDefault();
 
             if (melhor.Item is null)
             {
+                logger.LogWarning(
+                    "Shibata: nenhum resultado do autocomplete casou com os tokens obrigatórios de '{Termo}'.", termo);
                 return Result<ColetaPrecoRede>.Success(
                     new ColetaPrecoRede(Rede, null, null, Disponivel: false));
             }
@@ -126,6 +129,15 @@ public sealed partial class ShibataPrecoCollector(ILogger<ShibataPrecoCollector>
             var url = melhor.Item.Url is not null
                 ? new Uri(new Uri("https://www.loja.shibata.com.br"), melhor.Item.Url).ToString()
                 : null;
+
+            // O autocomplete nem sempre mostra preço (ex.: variação sem
+            // estoque na loja padrão). Nesse caso abre a página do
+            // produto e tenta ler o preço no corpo da página.
+            if (preco is null && url is not null)
+            {
+                preco = await TentarPrecoNaPaginaDoProduto(page, url, melhor.Item.Nome);
+            }
+
             return Result<ColetaPrecoRede>.Success(new ColetaPrecoRede(
                 Rede, melhor.Item.Nome, preco, preco is not null, url));
         }
@@ -133,6 +145,33 @@ public sealed partial class ShibataPrecoCollector(ILogger<ShibataPrecoCollector>
         {
             logger.LogWarning(ex, "Shibata: falha ao coletar o EAN {Ean} via Playwright.", ean);
             return Result<ColetaPrecoRede>.Failure("Falha ao consultar o site do Shibata.");
+        }
+    }
+
+    /// <summary>
+    /// Abre a página do produto e tenta extrair o preço do texto
+    /// ("R$ X,XX"). Retorna null se a página não exibir preço.
+    /// </summary>
+    private async Task<decimal?> TentarPrecoNaPaginaDoProduto(IPage page, string url, string nome)
+    {
+        try
+        {
+            await page.GotoAsync(url,
+                new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 20000 });
+            var conteudo = await page.EvaluateAsync<string>("() => document.body.innerText");
+            var m = Regex.Match(conteudo ?? string.Empty, @"R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})");
+            if (m.Success)
+            {
+                return ParsePreco(m.Groups[1].Value);
+            }
+
+            logger.LogWarning("Shibata: página de '{Nome}' não exibe preço.", nome);
+            return null;
+        }
+        catch (Exception ex) when (ex is TimeoutException or PlaywrightException)
+        {
+            logger.LogWarning(ex, "Shibata: falha ao abrir a página do produto '{Nome}'.", nome);
+            return null;
         }
     }
 

@@ -8,7 +8,7 @@ public sealed class CreateProductRequestValidator : AbstractValidator<CreateProd
     public CreateProductRequestValidator()
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(150);
-        RuleFor(x => x.Sku).NotEmpty().MaximumLength(60);
+        RuleFor(x => x.Barcode).NotEmpty().MaximumLength(50);
         RuleFor(x => x.CategoryId).NotEmpty();
         RuleFor(x => x.BrandId).NotEmpty();
         RuleFor(x => x.UnitOfMeasure).NotEmpty().MaximumLength(10);
@@ -24,7 +24,7 @@ public sealed class UpdateProductRequestValidator : AbstractValidator<UpdateProd
     public UpdateProductRequestValidator()
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(150);
-        RuleFor(x => x.Barcode).MaximumLength(50);
+        RuleFor(x => x.Barcode).NotEmpty().MaximumLength(50);
         RuleFor(x => x.CategoryId).NotEmpty();
         RuleFor(x => x.BrandId).NotEmpty();
         RuleFor(x => x.UnitOfMeasure).NotEmpty().MaximumLength(10);

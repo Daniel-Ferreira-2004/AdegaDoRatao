@@ -4,7 +4,7 @@ import { Minus, Plus, Trash2 } from 'lucide-react'
 import { getProducts } from '@/services/products/productsService'
 import { getSuppliers } from '@/services/suppliers/suppliersService'
 import { paymentMethodsService } from '@/services/catalog/catalogService'
-import { createPurchase } from '@/services/purchases/purchasesService'
+import { createPurchase, confirmPurchase } from '@/services/purchases/purchasesService'
 import type { ProductResponse } from '@/types/api'
 import { formatCurrency, toDateInputValue } from '@/utils/format'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -73,10 +73,15 @@ export default function NewPurchasePage() {
   }
 
   const mutation = useMutation({
-    mutationFn: createPurchase,
+    mutationFn: async (request: Parameters<typeof createPurchase>[0]) => {
+      const purchase = await createPurchase(request)
+      await confirmPurchase(purchase.id)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
-      toast({ variant: 'success', title: 'Compra registrada com sucesso.' })
+      queryClient.invalidateQueries({ queryKey: ['financial'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast({ variant: 'success', title: 'Compra registrada e confirmada com sucesso.' })
       setItems([])
       setSupplierId('')
       setDiscount('')

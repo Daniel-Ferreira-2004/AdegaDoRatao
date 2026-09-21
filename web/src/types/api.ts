@@ -74,8 +74,7 @@ export interface ProductResponse {
 export interface CreateProductRequest {
   name: string
   description?: string | null
-  sku: string
-  barcode?: string | null
+  barcode: string
   categoryId: string
   brandId: string
   unitOfMeasure: string
@@ -110,7 +109,7 @@ export interface PrecoMercadoResponse {
 export interface UpdateProductRequest {
   name: string
   description?: string | null
-  barcode?: string | null
+  barcode: string
   categoryId: string
   brandId: string
   unitOfMeasure: string

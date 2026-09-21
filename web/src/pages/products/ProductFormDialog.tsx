@@ -23,8 +23,7 @@ import { FormField } from '@/components/forms/form-field'
 
 const productSchema = z.object({
   name: z.string().min(1, 'Informe o nome').max(200),
-  sku: z.string().min(1, 'Informe o SKU').max(50),
-  barcode: z.string().max(50).optional().or(z.literal('')),
+  barcode: z.string().min(1, 'Informe o código de barras').max(50),
   description: z.string().max(500).optional().or(z.literal('')),
   categoryId: z.string().min(1, 'Selecione a categoria'),
   brandId: z.string().min(1, 'Selecione a marca'),
@@ -69,7 +68,6 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
         product
           ? {
               name: product.name,
-              sku: product.sku,
               barcode: product.barcode ?? '',
               description: product.description ?? '',
               categoryId: product.categoryId,
@@ -81,7 +79,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
               maxStock: product.maxStock ?? Number.NaN,
               allowNegativeStock: product.allowNegativeStock,
             }
-          : { allowNegativeStock: false, unitOfMeasure: 'UN', name: '', sku: '', categoryId: '', brandId: '', maxStock: Number.NaN },
+          : { allowNegativeStock: false, unitOfMeasure: 'UN', name: '', barcode: '', categoryId: '', brandId: '', maxStock: Number.NaN },
       )
     }
   }, [open, product, reset])
@@ -91,7 +89,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
       const payload = {
         name: data.name,
         description: data.description || null,
-        barcode: data.barcode || null,
+        barcode: data.barcode,
         categoryId: data.categoryId,
         brandId: data.brandId,
         unitOfMeasure: data.unitOfMeasure,
@@ -104,7 +102,6 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
       }
       return createProduct({
         ...payload,
-        sku: data.sku,
         costPrice: data.costPrice,
         salePrice: data.salePrice,
       })
@@ -144,10 +141,7 @@ export function ProductFormDialog({ open, onOpenChange, product }: ProductFormDi
             <FormField label="Nome" htmlFor="name" error={errors.name?.message} required>
               <Input id="name" {...register('name')} />
             </FormField>
-            <FormField label="SKU" htmlFor="sku" error={errors.sku?.message} required>
-              <Input id="sku" disabled={isEditing} {...register('sku')} />
-            </FormField>
-            <FormField label="Código de barras (EAN)" htmlFor="barcode" error={errors.barcode?.message}>
+            <FormField label="Código de barras (EAN)" htmlFor="barcode" error={errors.barcode?.message} required>
               <Input id="barcode" placeholder="Ex.: 7894900011517" {...register('barcode')} />
             </FormField>
             <FormField label="Unidade" htmlFor="unitOfMeasure" error={errors.unitOfMeasure?.message} required>

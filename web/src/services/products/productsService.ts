@@ -44,6 +44,11 @@ export async function getPrecosMercado(id: string): Promise<PrecoMercadoResponse
   return data
 }
 
+/** Dispara a coleta de preços de um EAN em todas as redes (agente de preços). */
+export async function atualizarPrecosMercado(ean: string): Promise<void> {
+  await apiClient.post(`/precos/atualizar/${encodeURIComponent(ean)}`)
+}
+
 export async function deleteProduct(id: string): Promise<void> {
   await apiClient.delete(`/products/${id}`)
 }

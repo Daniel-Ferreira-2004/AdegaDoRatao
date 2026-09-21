@@ -71,7 +71,8 @@ public sealed class AtacadaoPrecoCollector(
             {
                 produto = itens
                     .Select(x => (x, Score: NomeProdutoMatcher.Pontuar(nomeProduto, x.p.ProductName)))
-                    .Where(x => x.Score >= NomeProdutoMatcher.ScoreMinimo)
+                    .Where(x => x.Score >= NomeProdutoMatcher.ScoreMinimo
+                        && NomeProdutoMatcher.ContemTokensObrigatorios(nomeProduto, x.x.p.ProductName))
                     .OrderByDescending(x => Disponivel(x.x))
                     .ThenByDescending(x => x.Score)
                     .Select(x => ((VtexProduct p, VtexItem i)?)x.x)
@@ -87,12 +88,27 @@ public sealed class AtacadaoPrecoCollector(
             var encontrado = produto.Value;
             var oferta = encontrado.i.Sellers?.FirstOrDefault()?.Offer;
             var preco = oferta?.Price is > 0 ? oferta.Price : null;
-            var disponivel = oferta is { AvailableQuantity: > 0 } && preco is not null;
 
-            // A VTEX expõe o link relativo do produto no campo "link".
-            var url = encontrado.p.Link is not null
-                ? $"https://www.atacadao.com.br{encontrado.p.Link}"
-                : null;
+            // A VTEX expõe o link do produto no campo "link". Ele pode vir
+            // relativo ("/produto/p") ou absoluto ("https://secure.atacadao.com.br/..."),
+            // então só prefixamos o domínio quando for relativo.
+            var url = encontrado.p.Link switch
+            {
+                null => null,
+                var l when l.StartsWith("http", StringComparison.OrdinalIgnoreCase) => l,
+                var l => $"https://www.atacadao.com.br{l}"
+            };
+
+            // A API de catálogo nem sempre traz preço/estoque (varia por
+            // loja), mas a PÁGINA do produto exibe o preço regionalizado.
+            // Fallback: baixa o HTML da página e extrai o "R$ X,XX".
+            if (preco is null && url is not null)
+            {
+                preco = await TentarPrecoNaPagina(url, encontrado.p.ProductName, cancellationToken);
+            }
+
+            var disponivel = preco is not null
+                && (oferta is null || oferta.AvailableQuantity > 0 || oferta.Price is null or <= 0);
 
             return Result<ColetaPrecoRede>.Success(new ColetaPrecoRede(
                 Rede, encontrado.p.ProductName, preco, disponivel, url));
@@ -101,6 +117,35 @@ public sealed class AtacadaoPrecoCollector(
         {
             logger.LogWarning(ex, "Atacadão: falha ao coletar o EAN {Ean}.", ean);
             return Result<ColetaPrecoRede>.Failure("Falha ao consultar a API do Atacadão.");
+        }
+    }
+
+    /// <summary>
+    /// Baixa a página do produto e extrai o primeiro preço "R$ X,XX" do
+    /// HTML (a página é renderizada no servidor com o preço regionalizado).
+    /// Retorna null se não encontrar.
+    /// </summary>
+    private async Task<decimal?> TentarPrecoNaPagina(string url, string? nome, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var html = await http.GetStringAsync(url, cancellationToken);
+            var m = System.Text.RegularExpressions.Regex.Match(
+                html, @"R\$\s*(?:&nbsp;)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})");
+            if (!m.Success)
+            {
+                logger.LogWarning("Atacadão: página de '{Nome}' não exibe preço.", nome);
+                return null;
+            }
+
+            var texto = m.Groups[1].Value.Replace(".", "").Replace(",", ".");
+            return decimal.TryParse(texto, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out var valor) ? valor : null;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            logger.LogWarning(ex, "Atacadão: falha ao ler a página do produto '{Nome}'.", nome);
+            return null;
         }
     }
 

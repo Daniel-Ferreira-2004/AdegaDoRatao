@@ -71,10 +71,12 @@ public sealed class SondaPrecoCollector(ILogger<SondaPrecoCollector> logger) : I
                     new ColetaPrecoRede(Rede, null, null, Disponivel: false));
             }
 
-            // Escolhe o produto com melhor score de tokens.
+            // Escolhe o produto com melhor score de tokens, exigindo os
+            // tokens obrigatórios (medidas como "2l" e marca como "coca").
             var melhor = itens
                 .Select(x => (Item: x, Score: NomeProdutoMatcher.Pontuar(termo, x.Nome)))
-                .Where(x => x.Score >= NomeProdutoMatcher.ScoreMinimo)
+                .Where(x => x.Score >= NomeProdutoMatcher.ScoreMinimo
+                    && NomeProdutoMatcher.ContemTokensObrigatorios(termo, x.Item.Nome))
                 .OrderByDescending(x => x.Score)
                 .FirstOrDefault();
 

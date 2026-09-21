@@ -64,7 +64,7 @@ public sealed class PurchaseService : IPurchaseService
                 var stock = product.DarEntradaEmEstoque(item.Quantity);
                 _products.Atualizar(product);
                 await _movements.AdicionarAsync(StockMovement.CriarEntrada(product.Id, item.Quantity, stock.estoqueAnterior, stock.estoqueNovo,
-                    $"Compra #{purchase.Id}", userId, "Purchase", purchase.Id), cancellationToken);
+                    $"Compra de {purchase.Date:dd/MM/yyyy}", userId, "Purchase", purchase.Id), cancellationToken);
             }
             await _transactions.AdicionarAsync(FinancialTransaction.CriarDeCompra(purchase.Id, purchase.Total, DateTime.UtcNow,
                 purchasesCategory.Id, purchase.PaymentMethodId, userId), cancellationToken);
@@ -92,7 +92,7 @@ public sealed class PurchaseService : IPurchaseService
                     var stock = product.DarSaidaEmEstoque(item.Quantity);
                     _products.Atualizar(product);
                     await _movements.AdicionarAsync(StockMovement.CriarAjuste(product.Id, item.Quantity, stock.estoqueAnterior, stock.estoqueNovo,
-                        $"Estorno de compra #{purchase.Id}", userId, "Purchase", purchase.Id), cancellationToken);
+                        $"Estorno de compra de {purchase.Date:dd/MM/yyyy}", userId, "Purchase", purchase.Id), cancellationToken);
                 }
                 var category = await GetFinancialCategoryAsync("COMPRAS", cancellationToken);
                 await _transactions.AdicionarAsync(FinancialTransaction.CriarEstornoDeCompra(purchase.Id, purchase.Total, DateTime.UtcNow, category.Id, userId), cancellationToken);

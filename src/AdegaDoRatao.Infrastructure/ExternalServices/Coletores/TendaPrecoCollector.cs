@@ -116,7 +116,8 @@ public sealed partial class TendaPrecoCollector(
                         }
 
                         var score = NomeProdutoMatcher.Pontuar(nomeProduto, nome);
-                        if (score >= NomeProdutoMatcher.ScoreMinimo && score > melhorScore)
+                        if (score >= NomeProdutoMatcher.ScoreMinimo && score > melhorScore
+                            && NomeProdutoMatcher.ContemTokensObrigatorios(nomeProduto, nome))
                         {
                             melhor = candidato;
                             melhorScore = score;

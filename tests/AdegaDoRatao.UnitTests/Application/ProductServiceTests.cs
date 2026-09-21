@@ -28,8 +28,7 @@ public class ProductServiceTests
     private static CreateProductRequest CriarRequestValido() => new(
         Name: "Cerveja Skol 350ml",
         Description: null,
-        Sku: "SKOL-350",
-        Barcode: null,
+        Barcode: "7891991000763",
         CategoryId: Guid.NewGuid(),
         BrandId: Guid.NewGuid(),
         UnitOfMeasure: "UN",
@@ -47,24 +46,24 @@ public class ProductServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_ComSkuDuplicado_DeveFalhar()
+    public async Task CreateAsync_ComCodigoDeBarrasDuplicado_DeveFalhar()
     {
-        // RN01: SKU é único
-        _products.Setup(x => x.SkuJaExisteAsync("SKOL-350", null, It.IsAny<CancellationToken>()))
+        // RN01: código de barras (que também é o SKU) é único
+        _products.Setup(x => x.CodigoDeBarrasJaExisteAsync("7891991000763", null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
         var service = CriarServico();
 
         var act = () => service.CreateAsync(CriarRequestValido());
 
         await act.Should().ThrowAsync<UseCaseException>()
-            .WithMessage("*SKU*");
+            .WithMessage("*código de barras*");
         _products.Verify(x => x.AdicionarAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
     public async Task CreateAsync_ComDadosValidos_DevePersistirEAuditar()
     {
-        _products.Setup(x => x.SkuJaExisteAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
+        _products.Setup(x => x.CodigoDeBarrasJaExisteAsync(It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(false);
         ConfigurarCatalogoValido();
         var service = CriarServico();
@@ -72,7 +71,8 @@ public class ProductServiceTests
         var response = await service.CreateAsync(CriarRequestValido());
 
         response.Name.Should().Be("Cerveja Skol 350ml");
-        response.Sku.Should().Be("SKOL-350");
+        response.Sku.Should().Be("7891991000763");
+        response.Barcode.Should().Be("7891991000763");
         _products.Verify(x => x.AdicionarAsync(It.IsAny<Product>(), It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWork.Verify(x => x.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
         _audit.Verify(x => x.RegisterAsync("CREATE", nameof(Product), It.IsAny<string>(),

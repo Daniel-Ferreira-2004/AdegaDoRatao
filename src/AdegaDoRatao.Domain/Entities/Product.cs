@@ -109,13 +109,15 @@ public class Product : BaseAuditableEntity
     }
 
     /// <summary>
-    /// Altera o código de barras (EAN). A unicidade é validada na camada de
-    /// Application (ProductService), pois depende de consulta ao banco —
-    /// mesma lógica do SKU (RN01).
+    /// Altera o código de barras (EAN). O SKU acompanha automaticamente o
+    /// código de barras (SKU = EAN), então toda alteração de EAN atualiza o
+    /// SKU. A unicidade é validada na camada de Application (ProductService),
+    /// pois depende de consulta ao banco (RN01).
     /// </summary>
-    public void AlterarCodigoDeBarras(string? barcode)
+    public void AlterarCodigoDeBarras(string barcode)
     {
         SetBarcode(barcode);
+        SetSku(barcode);
         MarcarComoAtualizada();
     }
 
