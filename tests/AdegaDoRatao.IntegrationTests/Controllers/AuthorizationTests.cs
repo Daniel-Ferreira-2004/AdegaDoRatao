@@ -17,7 +17,7 @@ public class AuthorizationTests(CustomWebApplicationFactory factory)
     {
         var client = await factory.CreateAuthenticatedClientAsync(CustomWebApplicationFactory.OperadorEmail);
 
-        var response = await client.GetAsync("/api/financial/categories");
+        var response = await client.GetAsync("/api/v1/financial/categories");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -27,7 +27,7 @@ public class AuthorizationTests(CustomWebApplicationFactory factory)
     {
         var client = await factory.CreateAuthenticatedClientAsync(CustomWebApplicationFactory.GerenteEmail);
 
-        var response = await client.GetAsync("/api/financial/categories");
+        var response = await client.GetAsync("/api/v1/financial/categories");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -37,7 +37,7 @@ public class AuthorizationTests(CustomWebApplicationFactory factory)
     {
         var client = await factory.CreateAuthenticatedClientAsync(CustomWebApplicationFactory.AdminEmail);
 
-        var response = await client.GetAsync("/api/audit");
+        var response = await client.GetAsync("/api/v1/audit");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
@@ -48,7 +48,7 @@ public class AuthorizationTests(CustomWebApplicationFactory factory)
         // RN31: auditoria é restrita a ADMIN
         var client = await factory.CreateAuthenticatedClientAsync(CustomWebApplicationFactory.GerenteEmail);
 
-        var response = await client.GetAsync("/api/audit");
+        var response = await client.GetAsync("/api/v1/audit");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -58,7 +58,7 @@ public class AuthorizationTests(CustomWebApplicationFactory factory)
     {
         var client = await factory.CreateAuthenticatedClientAsync(CustomWebApplicationFactory.OperadorEmail);
 
-        var response = await client.GetAsync("/api/sales");
+        var response = await client.GetAsync("/api/v1/sales");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
     }

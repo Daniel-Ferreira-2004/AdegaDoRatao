@@ -11,7 +11,7 @@ namespace AdegaDoRatao.API.Controllers;
 /// são imutáveis (RN33). Restrito a ADMIN (RN31).
 /// </summary>
 [ApiController]
-[Route("api/audit")]
+[Route("api/v1/audit")]
 [Authorize(Policy = "audit.read")]
 public sealed class AuditController(IAuditQueryService service) : ControllerBase
 {

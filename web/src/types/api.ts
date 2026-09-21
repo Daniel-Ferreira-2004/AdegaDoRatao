@@ -18,6 +18,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   accessToken: string
   expiresAt: string
+  refreshToken: string
   userId: string
   name: string
   role: string

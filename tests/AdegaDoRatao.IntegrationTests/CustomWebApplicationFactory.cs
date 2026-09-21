@@ -112,7 +112,7 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     public async Task<HttpClient> CreateAuthenticatedClientAsync(string email, string password = SenhaPadrao)
     {
         var client = CreateClient();
-        var response = await client.PostAsJsonAsync("/api/auth/login", new { email, password });
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
         response.EnsureSuccessStatusCode();
 
         var login = await response.Content.ReadFromJsonAsync<LoginResponseDto>();

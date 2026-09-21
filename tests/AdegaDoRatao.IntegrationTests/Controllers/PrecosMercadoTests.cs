@@ -60,7 +60,7 @@ public class PrecosMercadoTests(CustomWebApplicationFactory factory)
         var client = ComServicoExterno(fake).CreateClient();
         client.DefaultRequestHeaders.Authorization = autenticado.DefaultRequestHeaders.Authorization;
 
-        var response = await client.GetAsync($"/api/products/{produtoId}/precos-mercado");
+        var response = await client.GetAsync($"/api/v1/products/{produtoId}/precos-mercado");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<PrecoMercadoResponse>();
@@ -85,7 +85,7 @@ public class PrecosMercadoTests(CustomWebApplicationFactory factory)
         var autenticado = await factory.CreateAuthenticatedClientAsync(CustomWebApplicationFactory.GerenteEmail);
         client.DefaultRequestHeaders.Authorization = autenticado.DefaultRequestHeaders.Authorization;
 
-        var response = await client.GetAsync($"/api/products/{produtoId}/precos-mercado");
+        var response = await client.GetAsync($"/api/v1/products/{produtoId}/precos-mercado");
 
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await response.Content.ReadFromJsonAsync<PrecoMercadoResponse>();

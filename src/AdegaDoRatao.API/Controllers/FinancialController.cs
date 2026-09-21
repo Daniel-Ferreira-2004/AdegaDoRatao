@@ -11,7 +11,7 @@ namespace AdegaDoRatao.API.Controllers;
 /// Categorias, lançamentos manuais, estorno e fluxo de caixa.
 /// </summary>
 [ApiController]
-[Route("api/financial")]
+[Route("api/v1/financial")]
 [Authorize]
 public sealed class FinancialController(IFinancialService service) : ControllerBase
 {

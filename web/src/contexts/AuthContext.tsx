@@ -2,11 +2,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import {
   clearSession,
   getStoredSession,
+  refreshStoredSession,
   setUnauthorizedHandler,
   storeSession,
   type StoredSession,
 } from '@/services/api/apiClient'
-import { login as loginRequest } from '@/services/auth/authService'
+import { login as loginRequest, revoke as revokeRequest } from '@/services/auth/authService'
 
 interface AuthContextValue {
   session: StoredSession | null
@@ -22,6 +23,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<StoredSession | null>(() => getStoredSession())
 
   const logout = useCallback(() => {
+    const current = getStoredSession()
+    if (current?.refreshToken) void revokeRequest(current.refreshToken)
     clearSession()
     setSession(null)
   }, [])
@@ -30,11 +33,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUnauthorizedHandler(logout)
   }, [logout])
 
+  // Ao abrir o app com o JWT expirado, tenta renovar via refresh token
+  // antes de mandar o usuário para a tela de login.
+  useEffect(() => {
+    if (session) return
+    let cancelled = false
+    refreshStoredSession().then((renewed) => {
+      if (!cancelled && renewed) setSession(renewed)
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const login = useCallback(async (email: string, password: string) => {
     const response = await loginRequest({ email, password })
     const session: StoredSession = {
       accessToken: response.accessToken,
       expiresAt: response.expiresAt,
+      refreshToken: response.refreshToken,
       userId: response.userId,
       name: response.name,
       role: response.role,

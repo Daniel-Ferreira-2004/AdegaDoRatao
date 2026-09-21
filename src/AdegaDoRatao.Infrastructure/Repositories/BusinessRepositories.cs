@@ -19,6 +19,7 @@ public sealed class FinancialTransactionRepository(AppDbContext c) : Repository<
 public sealed class UserRepository(AppDbContext c) : Repository<User>(c), IUserRepository { public Task<User?> ObterPorEmailAsync(string e,CancellationToken ct=default)=>Set.FirstOrDefaultAsync(x=>x.Email==e.Trim().ToLower(),ct); public Task<bool> EmailJaExisteAsync(string e,Guid? i=null,CancellationToken ct=default)=>Set.AnyAsync(x=>x.Email==e.Trim().ToLower()&&(!i.HasValue||x.Id!=i),ct); }
 public sealed class RoleRepository(AppDbContext c) : Repository<Role>(c), IRoleRepository { public Task<Role?> ObterPorNomeAsync(string n,CancellationToken ct=default)=>Set.FirstOrDefaultAsync(x=>x.Name==n.Trim().ToUpper(),ct); public async Task<IReadOnlyCollection<string>> ObterPermissoesAsync(Guid roleId,CancellationToken ct=default)=>await Context.RolePermissions.Where(x=>x.RoleId==roleId).Join(Context.Permissions,rp=>rp.PermissionId,p=>p.Id,(rp,p)=>p.Code).ToListAsync(ct); }
 public sealed class PermissionRepository(AppDbContext c) : Repository<Permission>(c), IPermissionRepository { }
+public sealed class RefreshTokenRepository(AppDbContext c) : Repository<RefreshToken>(c), IRefreshTokenRepository { public Task<RefreshToken?> ObterPorTokenHashAsync(string h,CancellationToken ct=default)=>Set.FirstOrDefaultAsync(x=>x.TokenHash==h,ct); }
 public sealed class AuditLogRepository(AppDbContext c) : Repository<AuditLog>(c), IAuditLogRepository
 {
     public async Task<IReadOnlyList<AuditLog>> ListarPorEntidadeAsync(string n, string id, CancellationToken ct = default)

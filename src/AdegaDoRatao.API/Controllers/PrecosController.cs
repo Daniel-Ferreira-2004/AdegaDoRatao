@@ -10,7 +10,7 @@ namespace AdegaDoRatao.API.Controllers;
 /// Restrito a ADMIN — a coleta é pesada (Shibata/Sonda usam navegador).
 /// </summary>
 [ApiController]
-[Route("api/precos")]
+[Route("api/v1/precos")]
 [Authorize(Roles = "ADMIN")]
 public sealed class PrecosController(IAtualizadorPrecosRedesService atualizador) : ControllerBase
 {

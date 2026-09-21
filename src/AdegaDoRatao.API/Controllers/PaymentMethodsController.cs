@@ -7,7 +7,7 @@ namespace AdegaDoRatao.API.Controllers;
 
 /// <summary>Cadastro mínimo de formas de pagamento, necessário para fechar uma venda.</summary>
 [ApiController]
-[Route("api/payment-methods")]
+[Route("api/v1/payment-methods")]
 [Authorize]
 public sealed class PaymentMethodsController(IPaymentMethodService service) : ControllerBase
 {
@@ -20,7 +20,7 @@ public sealed class PaymentMethodsController(IPaymentMethodService service) : Co
     public async Task<ActionResult<NamedEntityResponse>> Create(NamedEntityRequest request, CancellationToken ct)
     {
         var item = await service.CreateAsync(request, ct);
-        return Created($"api/payment-methods/{item.Id}", item);
+        return Created($"api/v1/payment-methods/{item.Id}", item);
     }
 
     [HttpPatch("{id:guid}/active")]

@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+**/logs/
+**/node_modules/
+**/dist/
+.git/
+.github/
+docs/
+tools/
+web/
+*.md
+docker-compose*.yml

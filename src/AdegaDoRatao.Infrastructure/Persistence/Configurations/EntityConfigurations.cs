@@ -40,6 +40,8 @@ public sealed class UserConfiguration : IEntityTypeConfiguration<User>
 { public void Configure(EntityTypeBuilder<User> b) { Mapping.Auditable(b,"Users"); b.Property(x=>x.Name).HasMaxLength(150).IsRequired(); b.Property(x=>x.Email).HasMaxLength(254).IsRequired(); b.HasIndex(x=>x.Email).IsUnique(); b.Property(x=>x.PasswordHash).HasMaxLength(255).IsRequired(); b.HasOne<Role>().WithMany().HasForeignKey(x=>x.RoleId).OnDelete(DeleteBehavior.Restrict); } }
 public sealed class RoleConfiguration : IEntityTypeConfiguration<Role>
 { public void Configure(EntityTypeBuilder<Role> b) { Mapping.Base(b,"Roles"); b.Property(x=>x.Name).HasMaxLength(50).IsRequired(); b.HasIndex(x=>x.Name).IsUnique(); } }
+public sealed class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
+{ public void Configure(EntityTypeBuilder<RefreshToken> b) { Mapping.Base(b,"RefreshTokens"); b.Property(x=>x.TokenHash).HasMaxLength(64).IsRequired(); b.HasIndex(x=>x.TokenHash).IsUnique(); b.HasIndex(x=>x.UserId); b.HasOne<User>().WithMany().HasForeignKey(x=>x.UserId).OnDelete(DeleteBehavior.Cascade); } }
 public sealed class PermissionConfiguration : IEntityTypeConfiguration<Permission>
 { public void Configure(EntityTypeBuilder<Permission> b) { Mapping.Base(b,"Permissions"); b.Property(x=>x.Code).HasMaxLength(100).IsRequired(); b.HasIndex(x=>x.Code).IsUnique(); b.Property(x=>x.Description).HasMaxLength(250); } }
 public sealed class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermission>

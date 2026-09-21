@@ -40,6 +40,12 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddControllers();
 
+// Health checks: /health executa um teste real contra o banco (SELECT 1 via
+// EF Core). Se o banco estiver fora, o endpoint responde 503 — é isso que
+// Docker/orquestradores usam para saber se o container está saudável.
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<AdegaDoRatao.Infrastructure.Persistence.AppDbContext>("database");
+
 // Swagger/OpenAPI (RNF07): documentação interativa da API, com suporte a
 // autenticação JWT direto pela UI (botão "Authorize").
 builder.Services.AddEndpointsApiExplorer();
@@ -191,10 +197,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// Endpoint de verificação de saúde (health check) simples, útil tanto
-// para monitoramento em produção quanto para o frontend confirmar que
-// a API está no ar antes de fazer chamadas.
-app.MapGet("/health", () => Results.Ok(new { status = "ok", service = "AdegaDoRatao.API" }));
+// Endpoint de verificação de saúde: 200 se a API e o banco estiverem OK,
+// 503 caso contrário. Usado por Docker/orquestradores e monitoramento.
+app.MapHealthChecks("/health");
 
 app.Run();
 

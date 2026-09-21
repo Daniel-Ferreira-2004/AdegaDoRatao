@@ -18,7 +18,7 @@ public class AuthControllerTests(CustomWebApplicationFactory factory)
     {
         var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/login", new
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new
         {
             email = CustomWebApplicationFactory.AdminEmail,
             password = CustomWebApplicationFactory.SenhaPadrao
@@ -34,7 +34,7 @@ public class AuthControllerTests(CustomWebApplicationFactory factory)
     {
         var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/login", new
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new
         {
             email = CustomWebApplicationFactory.AdminEmail,
             password = "senha-errada"
@@ -49,7 +49,7 @@ public class AuthControllerTests(CustomWebApplicationFactory factory)
     {
         var client = factory.CreateClient();
 
-        var response = await client.PostAsJsonAsync("/api/auth/login", new
+        var response = await client.PostAsJsonAsync("/api/v1/auth/login", new
         {
             email = "naoexiste@adega.com",
             password = "qualquer"
@@ -63,7 +63,7 @@ public class AuthControllerTests(CustomWebApplicationFactory factory)
     {
         var client = factory.CreateClient();
 
-        var response = await client.GetAsync("/api/products");
+        var response = await client.GetAsync("/api/v1/products");
 
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }

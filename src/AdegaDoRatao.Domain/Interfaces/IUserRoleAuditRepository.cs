@@ -19,6 +19,12 @@ public interface IPermissionRepository : IRepository<Permission>
 {
 }
 
+public interface IRefreshTokenRepository : IRepository<RefreshToken>
+{
+    /// <summary>Busca um refresh token pelo hash SHA-256 do token apresentado.</summary>
+    Task<RefreshToken?> ObterPorTokenHashAsync(string tokenHash, CancellationToken cancellationToken = default);
+}
+
 public interface IAuditLogRepository : IRepository<AuditLog>
 {
     Task<IReadOnlyList<AuditLog>> ListarPorEntidadeAsync(string entityName, string entityId,

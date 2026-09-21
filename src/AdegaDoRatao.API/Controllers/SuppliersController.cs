@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace AdegaDoRatao.API.Controllers;
 
-[ApiController, Route("api/suppliers"), Authorize]
+[ApiController, Route("api/v1/suppliers"), Authorize]
 public sealed class SuppliersController(ISupplierService service) : ControllerBase
 {
     [HttpGet, Authorize(Policy="purchases.read")] public Task<IReadOnlyList<SupplierResponse>> List(CancellationToken ct)=>service.ListAsync(ct);

@@ -6,26 +6,30 @@ const TOKEN_KEY = 'adega.session'
 export interface StoredSession {
   accessToken: string
   expiresAt: string
+  refreshToken: string
   userId: string
   name: string
   role: string
   permissions: string[]
 }
 
-export function getStoredSession(): StoredSession | null {
+/** Lê a sessão do storage sem checar expiração (uso interno do refresh). */
+function readRawSession(): StoredSession | null {
   try {
     const raw = localStorage.getItem(TOKEN_KEY)
-    if (!raw) return null
-    const session = JSON.parse(raw) as StoredSession
-    if (new Date(session.expiresAt).getTime() <= Date.now()) {
-      localStorage.removeItem(TOKEN_KEY)
-      return null
-    }
-    return session
+    return raw ? (JSON.parse(raw) as StoredSession) : null
   } catch {
     localStorage.removeItem(TOKEN_KEY)
     return null
   }
+}
+
+export function getStoredSession(): StoredSession | null {
+  const session = readRawSession()
+  // JWT expirado não é sessão válida para a UI — mas o refresh token ainda
+  // pode estar válido, então quem precisa dele usa readRawSession().
+  if (!session || new Date(session.expiresAt).getTime() <= Date.now()) return null
+  return session
 }
 
 export function storeSession(session: StoredSession) {
@@ -34,6 +38,22 @@ export function storeSession(session: StoredSession) {
 
 export function clearSession() {
   localStorage.removeItem(TOKEN_KEY)
+}
+
+/** Tenta renovar a sessão via refresh token. Usado na abertura do app quando o JWT já expirou. */
+export async function refreshStoredSession(): Promise<StoredSession | null> {
+  const session = readRawSession()
+  if (!session?.refreshToken) return null
+  try {
+    const { data } = await axios.post<StoredSession>(`${env.apiUrl}/auth/refresh`, {
+      refreshToken: session.refreshToken,
+    })
+    storeSession(data)
+    return data
+  } catch {
+    clearSession()
+    return null
+  }
 }
 
 /** Erro normalizado da API (ProblemDetails / ValidationProblemDetails). */
@@ -103,9 +123,48 @@ export function setUnauthorizedHandler(listener: UnauthorizedListener) {
   onUnauthorized = listener
 }
 
+// Renovação automática: ao receber 401, tenta trocar o refresh token por um
+// novo par de tokens UMA vez e repete a requisição original. Se o refresh
+// falhar (token revogado/expirado), aí sim desloga o usuário.
+let refreshPromise: Promise<boolean> | null = null
+
+async function tryRefreshSession(): Promise<boolean> {
+  // Lê sem o filtro de expiração: é justamente com o JWT expirado que o
+  // refresh token (vida longa) é usado.
+  const session = readRawSession()
+  if (!session?.refreshToken) return false
+  try {
+    const { data } = await axios.post<StoredSession>(`${env.apiUrl}/auth/refresh`, {
+      refreshToken: session.refreshToken,
+    })
+    storeSession(data)
+    return true
+  } catch {
+    return false
+  }
+}
+
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error?.config
+    const isAuthEndpoint = typeof originalRequest?.url === 'string' && originalRequest.url.includes('/auth/')
+    if (
+      axios.isAxiosError(error) &&
+      error.response?.status === 401 &&
+      !isAuthEndpoint &&
+      originalRequest &&
+      !originalRequest.__retriedAfterRefresh
+    ) {
+      originalRequest.__retriedAfterRefresh = true
+      // Evita rajadas de refresh paralelas quando várias requisições falham juntas.
+      refreshPromise ??= tryRefreshSession().finally(() => { refreshPromise = null })
+      if (await refreshPromise) {
+        const session = getStoredSession()
+        if (session) originalRequest.headers.Authorization = `Bearer ${session.accessToken}`
+        return apiClient(originalRequest)
+      }
+    }
     const normalized = normalizeApiError(error)
     if (normalized.status === 401 && onUnauthorized) {
       onUnauthorized()

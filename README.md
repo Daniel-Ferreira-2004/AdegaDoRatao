@@ -61,6 +61,29 @@ dotnet run --project src/AdegaDoRatao.API
 
 Swagger disponível em `https://localhost:{porta}/swagger` após subir a API.
 
+## Executando com Docker
+
+Alternativa sem instalar .NET/PostgreSQL localmente (requer Docker Desktop):
+
+```bash
+echo "JWT_SECRET=uma-chave-bem-grande-e-aleatoria" > .env
+docker compose up --build
+```
+
+Sobe a API (porta 8080) + PostgreSQL 16 juntos. As migrations **não** são aplicadas automaticamente — rode `dotnet ef database update` apontando para o banco do container (`Host=localhost;Port=5432;Database=adegadoratao;Username=postgres;Password=postgres`).
+
+Health check: `GET /health` retorna 200 apenas se a API **e o banco** estiverem saudáveis.
+
+## Frontend (web/)
+
+SPA em React + TypeScript + Vite + Tailwind, na pasta `web/`:
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
 ## Testes
 
 ```bash

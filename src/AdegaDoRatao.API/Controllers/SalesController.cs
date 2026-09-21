@@ -11,7 +11,7 @@ namespace AdegaDoRatao.API.Controllers;
 /// fica no SaleService. Operador precisa de sales.read/sales.write.
 /// </summary>
 [ApiController]
-[Route("api/sales")]
+[Route("api/v1/sales")]
 [Authorize]
 public sealed class SalesController(ISaleService service) : ControllerBase
 {

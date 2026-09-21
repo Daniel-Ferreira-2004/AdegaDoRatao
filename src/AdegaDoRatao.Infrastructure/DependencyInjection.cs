@@ -147,6 +147,8 @@ public static class DependencyInjection
 
         services.AddScoped<IPermissionRepository, PermissionRepository>();
 
+        services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+
 
         // ============================================================
         // INTEGRAÇÃO EXTERNA — PREÇOS DE MERCADO (Cnova Tech Data Market)

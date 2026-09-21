@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AdegaDoRatao.API.Controllers;
 
 [ApiController]
-[Route("api/products")]
+[Route("api/v1/products")]
 [Authorize]
 public sealed class ProductsController(IProductService service, IPrecoMercadoService precoMercado) : ControllerBase
 {

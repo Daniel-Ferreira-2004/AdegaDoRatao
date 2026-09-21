@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AdegaDoRatao.API.Controllers;
 
 [ApiController]
-[Route("api/stock")]
+[Route("api/v1/stock")]
 [Authorize]
 public sealed class StockController(IStockService stockService, IProductService productService) : ControllerBase
 {

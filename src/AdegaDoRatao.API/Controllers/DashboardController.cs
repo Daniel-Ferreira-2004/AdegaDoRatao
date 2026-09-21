@@ -10,7 +10,7 @@ namespace AdegaDoRatao.API.Controllers;
 /// indicadores em um único endpoint para o frontend.
 /// </summary>
 [ApiController]
-[Route("api/dashboard")]
+[Route("api/v1/dashboard")]
 [Authorize]
 public sealed class DashboardController(IDashboardService service) : ControllerBase
 {
