@@ -40,6 +40,12 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable(
             "ConnectionStrings__DefaultConnection",
             "Host=localhost;Database=testes;Username=teste;Password=teste");
+
+        // Sem o segredo JWT (User Secrets locais), a geração do token lança
+        // exceção e o login retorna 500. Valor fictício apenas para testes.
+        Environment.SetEnvironmentVariable(
+            "Jwt__Secret",
+            "chave-de-testes-integracao-com-tamanho-suficiente-para-hmac-sha256");
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
