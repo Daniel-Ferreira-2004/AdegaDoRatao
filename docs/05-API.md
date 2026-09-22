@@ -4,7 +4,8 @@ API RESTful, JSON, documentada via Swagger/OpenAPI, protegida por JWT (Bearer).
 
 ## 1. Convenções
 
-- Recursos no plural, kebab/lowercase: `/api/products`.
+- Versionamento na URL: todas as rotas sob `/api/v1/`.
+- Recursos no plural, kebab/lowercase: `/api/v1/products`.
 - Paginação: `?page=1&pageSize=20` com resposta `PagedResult<T>` (`items`, `totalCount`, `page`, `pageSize`).
 - Filtros via query string (`?name=`, `?sku=`, `?categoryId=`, `?status=`).
 - Datas em ISO 8601 UTC.
@@ -13,87 +14,92 @@ API RESTful, JSON, documentada via Swagger/OpenAPI, protegida por JWT (Bearer).
 ## 2. Endpoints
 
 ```text
-POST   /api/auth/login
-POST   /api/auth/refresh                (evolução futura)
+POST   /api/v1/auth/login
+POST   /api/v1/auth/refresh             (rotaciona o refresh token)
+POST   /api/v1/auth/revoke              (logout: revoga o refresh token)
 
-GET    /api/products
-GET    /api/products/{id}
-GET    /api/products/search?query=
-POST   /api/products
-PUT    /api/products/{id}
-PATCH  /api/products/{id}/status        (ativar/desativar)
-PATCH  /api/products/{id}/price
-GET    /api/products/{id}/history
+GET    /api/v1/products
+GET    /api/v1/products/{id}
+GET    /api/v1/products/search?query=
+POST   /api/v1/products
+PUT    /api/v1/products/{id}
+PATCH  /api/v1/products/{id}/status     (ativar/desativar)
+PATCH  /api/v1/products/{id}/price
+GET    /api/v1/products/{id}/history
 
-GET    /api/categories
-GET    /api/categories/{id}
-POST   /api/categories
-PUT    /api/categories/{id}
-PATCH  /api/categories/{id}/status
+GET    /api/v1/categories
+GET    /api/v1/categories/{id}
+POST   /api/v1/categories
+PUT    /api/v1/categories/{id}
+PATCH  /api/v1/categories/{id}/status
 
-GET    /api/brands
-GET    /api/brands/{id}
-POST   /api/brands
-PUT    /api/brands/{id}
-PATCH  /api/brands/{id}/status
+GET    /api/v1/brands
+GET    /api/v1/brands/{id}
+POST   /api/v1/brands
+PUT    /api/v1/brands/{id}
+PATCH  /api/v1/brands/{id}/status
 
-GET    /api/stock/movements?productId=&from=&to=
-POST   /api/stock/movements              (entrada/saída/ajuste manual)
-GET    /api/stock/low                    (abaixo do mínimo)
-GET    /api/stock/out-of-stock
+GET    /api/v1/stock/movements?productId=&from=&to=
+POST   /api/v1/stock/movements           (entrada/saída/ajuste manual)
+GET    /api/v1/stock/low                 (abaixo do mínimo)
+GET    /api/v1/stock/out-of-stock
 
-GET    /api/suppliers
-GET    /api/suppliers/{id}
-POST   /api/suppliers
-PUT    /api/suppliers/{id}
-PATCH  /api/suppliers/{id}/status
+GET    /api/v1/suppliers
+GET    /api/v1/suppliers/{id}
+POST   /api/v1/suppliers
+PUT    /api/v1/suppliers/{id}
+PATCH  /api/v1/suppliers/{id}/status
 
-GET    /api/purchases
-GET    /api/purchases/{id}
-POST   /api/purchases
-POST   /api/purchases/{id}/confirm
-POST   /api/purchases/{id}/cancel
+GET    /api/v1/purchases
+GET    /api/v1/purchases/{id}
+POST   /api/v1/purchases
+POST   /api/v1/purchases/{id}/confirm
+POST   /api/v1/purchases/{id}/cancel
 
-GET    /api/sales
-GET    /api/sales/{id}
-POST   /api/sales
-POST   /api/sales/{id}/cancel
+GET    /api/v1/sales
+GET    /api/v1/sales/{id}
+POST   /api/v1/sales
+POST   /api/v1/sales/{id}/cancel
 
-GET    /api/payment-methods
-POST   /api/payment-methods
+GET    /api/v1/payment-methods
+POST   /api/v1/payment-methods
 
-GET    /api/financial/categories
-POST   /api/financial/categories
-GET    /api/financial/transactions?from=&to=&type=
-POST   /api/financial/transactions
-GET    /api/financial/cash-flow?period=
+GET    /api/v1/financial/categories
+POST   /api/v1/financial/categories
+GET    /api/v1/financial/transactions?from=&to=&type=
+POST   /api/v1/financial/transactions
+GET    /api/v1/financial/cash-flow?period=
 
-GET    /api/dashboard/summary
-GET    /api/dashboard/top-products
-GET    /api/dashboard/payment-methods-usage
+GET    /api/v1/dashboard/summary
+GET    /api/v1/dashboard/top-products
+GET    /api/v1/dashboard/payment-methods-usage
 
-GET    /api/users
-POST   /api/users
-PUT    /api/users/{id}
-PATCH  /api/users/{id}/status
+GET    /api/v1/users
+POST   /api/v1/users
+PUT    /api/v1/users/{id}
+PATCH  /api/v1/users/{id}/status
 
-GET    /api/roles
-GET    /api/roles/{id}/permissions
-PUT    /api/roles/{id}/permissions
+GET    /api/v1/roles
+GET    /api/v1/roles/{id}/permissions
+PUT    /api/v1/roles/{id}/permissions
 
-GET    /api/audit-logs?entityName=&entityId=
+GET    /api/v1/audit-logs?entityName=&entityId=
+
+GET    /health                          (health check: 200 = API + banco OK)
 ```
 
 ## 3. Autenticação e Autorização na API
 
-- `POST /api/auth/login` recebe `{ email, password }`, retorna `{ token, expiresAt, user: { id, name, role } }`.
+- `POST /api/v1/auth/login` recebe `{ email, password }`, retorna `{ accessToken, expiresAt, refreshToken, userId, name, role, permissions }`.
+- O `refreshToken` (vida longa, 30 dias) permite obter um novo JWT sem nova senha via `POST /api/v1/auth/refresh`. A cada uso o refresh token é rotacionado (o anterior é revogado); reuso de token revogado é recusado (anti-replay). Apenas o hash SHA-256 do token é persistido.
+- `POST /api/v1/auth/revoke` invalida o refresh token (logout).
 - Todos os demais endpoints exigem header `Authorization: Bearer {token}`.
 - Autorização por policy baseada em `Permission` (ex.: `[Authorize(Policy = "products.write")]`), resolvida a partir das claims do token (RoleId + permissões do Role carregadas no momento do login).
 
 ## 4. Exemplo de DTOs
 
 ```json
-// POST /api/products (request)
+// POST /api/v1/products (request)
 {
   "name": "Cerveja Heineken Long Neck 330ml",
   "description": "Cerveja lager premium",
