@@ -31,20 +31,20 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
     public const string OperadorEmail = "operador@adega.com";
     public const string SenhaPadrao = "Senha@123";
 
+    static CustomWebApplicationFactory()
+    {
+        // Em CI não há User Secrets: fornece uma connection string fictícia via
+        // variável de ambiente só para o AddInfrastructure não falhar na validação.
+        // O DbContext real é substituído pelo SQLite in-memory no ConfigureWebHost
+        // — essa string nunca é usada de fato.
+        Environment.SetEnvironmentVariable(
+            "ConnectionStrings__DefaultConnection",
+            "Host=localhost;Database=testes;Username=teste;Password=teste");
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Development");
-
-        // Em CI não há User Secrets: fornece uma connection string fictícia só
-        // para o AddInfrastructure não falhar na validação. O DbContext real é
-        // substituído pelo SQLite in-memory logo abaixo — essa string nunca é usada.
-        builder.ConfigureAppConfiguration((_, config) =>
-        {
-            config.AddInMemoryCollection(new Dictionary<string, string?>
-            {
-                ["ConnectionStrings:DefaultConnection"] = "Host=localhost;Database=testes;Username=teste;Password=teste"
-            });
-        });
 
         builder.ConfigureServices(services =>
         {
