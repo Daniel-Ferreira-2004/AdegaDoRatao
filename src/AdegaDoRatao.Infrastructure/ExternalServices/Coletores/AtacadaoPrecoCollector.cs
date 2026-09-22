@@ -121,8 +121,15 @@ public sealed class AtacadaoPrecoCollector(
     }
 
     /// <summary>
-    /// Baixa a página do produto e extrai o primeiro preço "R$ X,XX" do
-    /// HTML (a página é renderizada no servidor com o preço regionalizado).
+    /// Baixa a página do produto e extrai o preço do bloco JSON-LD
+    /// (schema.org Product → offers.price), que é o preço real exibido
+    /// no site. A API de catálogo nem sempre traz o preço (vem 0 quando
+    /// o item está sem estoque no canal), mas a página é renderizada no
+    /// servidor com o preço regionalizado.
+    ///
+    /// NÃO usar o primeiro "R$ X,XX" do HTML: ele pode ser o "Resumo da
+    /// compra" de outra SKU ou de uma seção de relacionados, gerando
+    /// preço errado. Fallback: primeiro "R$ X,XX" só se o JSON-LD falhar.
     /// Retorna null se não encontrar.
     /// </summary>
     private async Task<decimal?> TentarPrecoNaPagina(string url, string? nome, CancellationToken cancellationToken)
@@ -130,6 +137,21 @@ public sealed class AtacadaoPrecoCollector(
         try
         {
             var html = await http.GetStringAsync(url, cancellationToken);
+
+            // 1) JSON-LD: {"@type":"Product",...,"offers":{"price":9.99,...}}
+            var jsonLd = System.Text.RegularExpressions.Regex.Match(
+                html, @"""@type""\s*:\s*""Product"".*?""offers""\s*:\s*\{\s*""price""\s*:\s*([\d]+(?:\.[\d]+)?)",
+                System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (jsonLd.Success
+                && decimal.TryParse(jsonLd.Groups[1].Value,
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out var precoJsonLd)
+                && precoJsonLd > 0)
+            {
+                return precoJsonLd;
+            }
+
+            // 2) Fallback: primeiro "R$ X,XX" do HTML.
             var m = System.Text.RegularExpressions.Regex.Match(
                 html, @"R\$\s*(?:&nbsp;)?\s*(\d{1,3}(?:\.\d{3})*,\d{2})");
             if (!m.Success)
