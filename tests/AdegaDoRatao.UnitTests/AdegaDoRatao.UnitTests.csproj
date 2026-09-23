@@ -26,6 +26,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\AdegaDoRatao.Domain\AdegaDoRatao.Domain.csproj" />
     <ProjectReference Include="..\..\src\AdegaDoRatao.Application\AdegaDoRatao.Application.csproj" />
+    <!-- Coletores de preço (testados com HttpClient simulado, sem rede) -->
+    <ProjectReference Include="..\..\src\AdegaDoRatao.Infrastructure\AdegaDoRatao.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

@@ -17,6 +17,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Expõe internals (ex.: NomeProdutoMatcher) aos testes unitários -->
+    <InternalsVisibleTo Include="AdegaDoRatao.UnitTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Entity Framework Core + provider do PostgreSQL (Npgsql) -->
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.8" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="8.0.8" />

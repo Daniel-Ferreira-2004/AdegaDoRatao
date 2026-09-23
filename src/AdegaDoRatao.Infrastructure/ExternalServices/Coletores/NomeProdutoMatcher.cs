@@ -53,7 +53,14 @@ internal static class NomeProdutoMatcher
 
         var tokens = Tokens(termoBuscado);
         var nome = Normalizar(nomeCandidato);
-        var comDigito = tokens.Where(t => t.Any(char.IsDigit)).ToList();
+        // Tokens obrigatórios com dígito: prefere os PURAMENTE numéricos
+        // ("5", "120"), que casam tanto com "5kg" quanto com "5 kg". Os
+        // compostos ("5kg") só são exigidos quando não há numérico puro —
+        // exigi-los sempre impediria casar "Arroz 5kg" com "Arroz 5 Kg".
+        var numericos = tokens.Where(t => t.All(char.IsDigit)).ToList();
+        var comDigito = numericos.Count > 0
+            ? numericos
+            : tokens.Where(t => t.Any(char.IsDigit)).ToList();
         var alfabeticos = tokens.Where(t => t.Length >= 3 && t.All(char.IsLetter)).ToList();
         return comDigito.All(nome.Contains)
             && (alfabeticos.Count == 0 || alfabeticos.Any(nome.Contains));

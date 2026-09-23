@@ -95,6 +95,9 @@ export interface PrecoMercadoRedeResponse {
   mensagem: string | null
   distanciaKm: number | null
   urlProduto: string | null
+  tipoPreco?: string | null
+  confianca?: string | null
+  regiaoConfirmada?: boolean
 }
 
 export interface PrecoMercadoResponse {

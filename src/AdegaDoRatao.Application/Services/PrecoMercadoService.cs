@@ -118,7 +118,10 @@ public sealed class PrecoMercadoService : IPrecoMercadoService
                     s.Disponivel || s.Preco is not null,
                     s.Disponivel || s.Preco is not null ? null : MensagemIndisponibilidade(s),
                     DistanciaKm: null,
-                    UrlProduto: s.UrlProduto))
+                    UrlProduto: s.UrlProduto,
+                    TipoPreco: s.TipoPreco.ToString(),
+                    Confianca: s.Confianca.ToString(),
+                    RegiaoConfirmada: s.RegiaoConfirmada))
                 .OrderBy(p => p.Disponivel ? 0 : 1)
                 .ThenBy(p => p.Preco ?? decimal.MaxValue)
                 .ToArray();

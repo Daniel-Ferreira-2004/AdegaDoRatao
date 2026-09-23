@@ -18,6 +18,9 @@ namespace AdegaDoRatao.Application.DTOs;
 /// <param name="DistanciaKm">Distância estimada (em km) de Ferraz de Vasconcelos até o centro
 /// da cidade da loja; null quando a cidade não está no catálogo da região.</param>
 /// <param name="UrlProduto">Link da página do produto no site da rede (quando coletado pelo agente).</param>
+/// <param name="TipoPreco">Classificação do preço coletado (Normal, Promocional, CondicionadoQuantidade...).</param>
+/// <param name="Confianca">Nível de confiança do dado (High, Medium, Low, Unverified).</param>
+/// <param name="RegiaoConfirmada">true quando o coletor confirmou que o preço é da região da adega.</param>
 public sealed record PrecoMercadoRedeResponse(
     string Rede,
     string? Cidade,
@@ -25,7 +28,10 @@ public sealed record PrecoMercadoRedeResponse(
     bool Disponivel,
     string? Mensagem,
     double? DistanciaKm = null,
-    string? UrlProduto = null);
+    string? UrlProduto = null,
+    string? TipoPreco = null,
+    string? Confianca = null,
+    bool RegiaoConfirmada = false);
 
 /// <summary>
 /// Resultado da comparação de preços de mercado de um produto do catálogo.

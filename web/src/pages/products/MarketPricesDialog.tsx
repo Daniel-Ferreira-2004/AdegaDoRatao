@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { TrendingDown, MapPin, RefreshCw, ExternalLink } from 'lucide-react'
 import { atualizarPrecosMercado, getPrecosMercado } from '@/services/products/productsService'
@@ -60,6 +60,30 @@ export function MarketPricesDialog({ open, onOpenChange, product }: MarketPrices
       toast({ variant: 'error', title: 'Não foi possível atualizar os preços.', description: error.message }),
   })
 
+  // Coleta sob demanda: produto recém-cadastrado ainda não tem snapshot
+  // local (origemCache=false) — pesquisa nas redes na hora, uma única vez
+  // por abertura do modal (o ref evita loop quando a coleta não encontra
+  // o produto em nenhuma rede).
+  const coletaDisparada = useRef<string | null>(null)
+  useEffect(() => {
+    if (!open) {
+      coletaDisparada.current = null
+      return
+    }
+    if (
+      data &&
+      !data.consultaFalhou &&
+      !data.origemCache &&
+      ean &&
+      !atualizar.isPending &&
+      coletaDisparada.current !== product?.id
+    ) {
+      coletaDisparada.current = product?.id ?? null
+      atualizar.mutate()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, data, ean, product?.id])
+
   const precosOrdenados = useMemo(() => (data ? ordenar(data.precos) : []), [data])
   const menorPreco = precosOrdenados.find((p) => p.disponivel && p.preco !== null)?.preco ?? null
 
@@ -74,8 +98,14 @@ export function MarketPricesDialog({ open, onOpenChange, product }: MarketPrices
           </DialogDescription>
         </DialogHeader>
 
-        {isLoading ? (
-          <LoadingState message="Consultando preços nos mercados..." />
+        {isLoading || atualizar.isPending ? (
+          <LoadingState
+            message={
+              atualizar.isPending
+                ? 'Pesquisando nas redes (Tenda, Atacadão, Shibata, Sonda)...'
+                : 'Consultando preços nos mercados...'
+            }
+          />
         ) : isError ? (
           <ErrorState
             title="Não foi possível consultar os preços."
@@ -107,6 +137,11 @@ export function MarketPricesDialog({ open, onOpenChange, product }: MarketPrices
                         {isMenor && (
                           <Badge variant="success" className="gap-1">
                             <TrendingDown className="h-3 w-3" /> Menor preço
+                          </Badge>
+                        )}
+                        {item.tipoPreco === 'CondicionadoQuantidade' && (
+                          <Badge variant="secondary" title="Preço com desconto por quantidade (ex.: a partir de N unidades)">
+                            Preço atacado
                           </Badge>
                         )}
                       </p>

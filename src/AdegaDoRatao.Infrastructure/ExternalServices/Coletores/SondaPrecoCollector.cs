@@ -1,5 +1,6 @@
 using AdegaDoRatao.Application.Common;
 using AdegaDoRatao.Application.Interfaces;
+using AdegaDoRatao.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.Playwright;
 
@@ -90,8 +91,14 @@ public sealed class SondaPrecoCollector(ILogger<SondaPrecoCollector> logger) : I
             var url = melhor.Item.Url is not null
                 ? new Uri(new Uri("https://www.sondadelivery.com.br"), melhor.Item.Url).ToString()
                 : null;
+
+            // REGIÃO NÃO CONFIRMADA e SEM EAN: o site não expõe o EAN e o
+            // preço é da loja padrão — confiança baixa por definição.
             return Result<ColetaPrecoRede>.Success(new ColetaPrecoRede(
-                Rede, melhor.Item.Nome, preco, preco is not null, url));
+                Rede, melhor.Item.Nome, preco, preco is not null, url,
+                TipoPrecoColeta.Normal,
+                preco is null ? NivelConfiancaColeta.Unverified : NivelConfiancaColeta.Low,
+                RegiaoConfirmada: false));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

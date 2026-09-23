@@ -1,14 +1,25 @@
 using AdegaDoRatao.Application.Common;
+using AdegaDoRatao.Domain.Enums;
 
 namespace AdegaDoRatao.Application.Interfaces;
 
-/// <summary>Resultado da coleta de um produto em uma rede.</summary>
+/// <summary>
+/// Resultado da coleta de um produto em uma rede.
+///
+/// Regras de auditoria: preço não confirmado nunca é tratado como
+/// definitivo (<see cref="TipoPrecoColeta.NaoConfirmado"/> /
+/// <see cref="NivelConfiancaColeta.Unverified"/>) e a região só é marcada
+/// como confirmada quando o coletor validou o CEP/loja da adega.
+/// </summary>
 public sealed record ColetaPrecoRede(
     string Rede,
     string? NomeProdutoNaRede,
     decimal? Preco,
     bool Disponivel,
-    string? UrlProduto = null);
+    string? UrlProduto = null,
+    TipoPrecoColeta TipoPreco = TipoPrecoColeta.Normal,
+    NivelConfiancaColeta Confianca = NivelConfiancaColeta.Unverified,
+    bool RegiaoConfirmada = false);
 
 /// <summary>
 /// Porta de saída para um coletor de preços de uma rede específica

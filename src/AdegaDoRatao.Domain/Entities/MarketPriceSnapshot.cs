@@ -1,4 +1,5 @@
 using AdegaDoRatao.Domain.Common;
+using AdegaDoRatao.Domain.Enums;
 
 namespace AdegaDoRatao.Domain.Entities;
 
@@ -20,12 +21,24 @@ public class MarketPriceSnapshot : BaseEntity
     /// <summary>URL da página do produto no site da rede (para o botão "Ver no site").</summary>
     public string? UrlProduto { get; private set; }
 
+    /// <summary>Classificação do preço (normal, promocional, condicionado etc.).</summary>
+    public TipoPrecoColeta TipoPreco { get; private set; } = TipoPrecoColeta.Normal;
+
+    /// <summary>Nível de confiança do dado coletado.</summary>
+    public NivelConfiancaColeta Confianca { get; private set; } = NivelConfiancaColeta.Unverified;
+
+    /// <summary>true quando o coletor confirmou que o preço é da região/loja da adega.</summary>
+    public bool RegiaoConfirmada { get; private set; }
+
     private MarketPriceSnapshot()
     {
     }
 
     public MarketPriceSnapshot(string ean, string rede, string? nomeProdutoNaRede,
-        decimal? preco, bool disponivel, string? urlProduto = null)
+        decimal? preco, bool disponivel, string? urlProduto = null,
+        TipoPrecoColeta tipoPreco = TipoPrecoColeta.Normal,
+        NivelConfiancaColeta confianca = NivelConfiancaColeta.Unverified,
+        bool regiaoConfirmada = false)
     {
         if (string.IsNullOrWhiteSpace(ean))
         {
@@ -43,15 +56,24 @@ public class MarketPriceSnapshot : BaseEntity
         Preco = preco;
         Disponivel = disponivel;
         UrlProduto = string.IsNullOrWhiteSpace(urlProduto) ? null : urlProduto.Trim();
+        TipoPreco = tipoPreco;
+        Confianca = confianca;
+        RegiaoConfirmada = regiaoConfirmada;
         ColetadoEm = DateTime.UtcNow;
     }
 
-    public void Atualizar(decimal? preco, bool disponivel, string? nomeProdutoNaRede, string? urlProduto = null)
+    public void Atualizar(decimal? preco, bool disponivel, string? nomeProdutoNaRede, string? urlProduto = null,
+        TipoPrecoColeta tipoPreco = TipoPrecoColeta.Normal,
+        NivelConfiancaColeta confianca = NivelConfiancaColeta.Unverified,
+        bool regiaoConfirmada = false)
     {
         Preco = preco;
         Disponivel = disponivel;
         NomeProdutoNaRede = string.IsNullOrWhiteSpace(nomeProdutoNaRede) ? NomeProdutoNaRede : nomeProdutoNaRede.Trim();
         UrlProduto = string.IsNullOrWhiteSpace(urlProduto) ? UrlProduto : urlProduto.Trim();
+        TipoPreco = tipoPreco;
+        Confianca = confianca;
+        RegiaoConfirmada = regiaoConfirmada;
         ColetadoEm = DateTime.UtcNow;
         MarcarComoAtualizada();
     }

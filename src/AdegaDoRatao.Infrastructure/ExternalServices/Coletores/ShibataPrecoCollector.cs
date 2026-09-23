@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using AdegaDoRatao.Application.Common;
 using AdegaDoRatao.Application.Interfaces;
+using AdegaDoRatao.Domain.Enums;
 using Microsoft.Extensions.Logging;
 using Microsoft.Playwright;
 
@@ -138,8 +139,13 @@ public sealed partial class ShibataPrecoCollector(ILogger<ShibataPrecoCollector>
                 preco = await TentarPrecoNaPaginaDoProduto(page, url, melhor.Item.Nome);
             }
 
+            // REGIÃO NÃO CONFIRMADA e SEM EAN: o site não expõe o EAN e o
+            // preço é da loja padrão — confiança baixa por definição.
             return Result<ColetaPrecoRede>.Success(new ColetaPrecoRede(
-                Rede, melhor.Item.Nome, preco, preco is not null, url));
+                Rede, melhor.Item.Nome, preco, preco is not null, url,
+                TipoPrecoColeta.Normal,
+                preco is null ? NivelConfiancaColeta.Unverified : NivelConfiancaColeta.Low,
+                RegiaoConfirmada: false));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
