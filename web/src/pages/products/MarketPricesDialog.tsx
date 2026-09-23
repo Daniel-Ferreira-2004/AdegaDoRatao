@@ -63,7 +63,8 @@ export function MarketPricesDialog({ open, onOpenChange, product }: MarketPrices
   // Coleta sob demanda: produto recém-cadastrado ainda não tem snapshot
   // local (origemCache=false) — pesquisa nas redes na hora, uma única vez
   // por abertura do modal (o ref evita loop quando a coleta não encontra
-  // o produto em nenhuma rede).
+  // o produto em nenhuma rede). Também dispara quando a API externa falhou
+  // (consultaFalhou=true), pois nesse caso não há dado local nem externo.
   const coletaDisparada = useRef<string | null>(null)
   useEffect(() => {
     if (!open) {
@@ -72,7 +73,6 @@ export function MarketPricesDialog({ open, onOpenChange, product }: MarketPrices
     }
     if (
       data &&
-      !data.consultaFalhou &&
       !data.origemCache &&
       ean &&
       !atualizar.isPending &&
