@@ -189,8 +189,11 @@ public sealed class DavoPrecoCollector(ILogger<DavoPrecoCollector> logger) : IPr
             // preço em destaque no site.
             var preco = melhorItem.PrecoOferta ?? melhorItem.Preco;
             var disponivel = melhorItem.Disponivel && preco is not null;
-            var urlProduto = melhorItem.Link is not null
-                ? $"https://www.davo.com.br/produto/{melhorItem.Link}"
+            // A URL real do site é /produto/{produto_id}/{slug} — o campo
+            // "link" da API traz SÓ o slug; sem o id o SPA redireciona
+            // para /produto/NaN/{slug} e exibe "Produto Indisponível".
+            var urlProduto = melhorItem.Link is not null && melhorItem.ProdutoId is not null
+                ? $"https://www.davo.com.br/produto/{melhorItem.ProdutoId}/{melhorItem.Link}"
                 : null;
 
             // A API expõe o EAN: confiança High quando confere, Medium só
@@ -236,6 +239,9 @@ public sealed class DavoPrecoCollector(ILogger<DavoPrecoCollector> logger) : IPr
                     Descricao = p.TryGetProperty("descricao", out var d) ? d.GetString() ?? "" : "",
                     CodigoBarras = p.TryGetProperty("codigo_barras", out var e) ? e.GetString() : null,
                     Link = p.TryGetProperty("link", out var l) ? l.GetString() : null,
+                    ProdutoId = p.TryGetProperty("produto_id", out var pid) && pid.ValueKind == System.Text.Json.JsonValueKind.Number
+                        ? pid.GetInt64()
+                        : null,
                     Disponivel = p.TryGetProperty("disponivel", out var disp) && disp.GetBoolean(),
                     Preco = LerPreco(p, "preco"),
                     PrecoOferta = p.TryGetProperty("oferta", out var of) && of.ValueKind == System.Text.Json.JsonValueKind.Object
@@ -271,6 +277,7 @@ public sealed class DavoPrecoCollector(ILogger<DavoPrecoCollector> logger) : IPr
         public string Descricao { get; set; } = string.Empty;
         public string? CodigoBarras { get; set; }
         public string? Link { get; set; }
+        public long? ProdutoId { get; set; }
         public bool Disponivel { get; set; }
         public decimal? Preco { get; set; }
         public decimal? PrecoOferta { get; set; }
