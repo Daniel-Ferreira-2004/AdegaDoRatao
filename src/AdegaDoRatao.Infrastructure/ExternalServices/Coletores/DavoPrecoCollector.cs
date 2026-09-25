@@ -44,7 +44,15 @@ public sealed class DavoPrecoCollector(ILogger<DavoPrecoCollector> logger) : IPr
         {
             using var playwright = await Playwright.CreateAsync();
             await using var browser = await playwright.Chromium.LaunchAsync(new() { Headless = true });
-            var page = await browser.NewPageAsync();
+            // Contexto com UA/viewport de navegador real — o SPA pode não
+            // renderizar o seletor de loja em headless "cru".
+            await using var context = await browser.NewContextAsync(new()
+            {
+                UserAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                ViewportSize = new ViewportSize { Width = 1366, Height = 900 },
+                Locale = "pt-BR"
+            });
+            var page = await context.NewPageAsync();
 
             // Seleciona a loja de Suzano antes de buscar — o preço é por CD.
             await SelecionarLojaSuzano(page);
@@ -66,7 +74,16 @@ public sealed class DavoPrecoCollector(ILogger<DavoPrecoCollector> logger) : IPr
             try
             {
                 await page.GotoAsync($"https://www.davo.com.br/busca?termo={Uri.EscapeDataString(termo)}",
-                    new PageGotoOptions { WaitUntil = WaitUntilState.NetworkIdle, Timeout = 45000 });
+                    new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 45000 });
+
+                // Aguarda a resposta da API de busca (NetworkIdle nem sempre
+                // dispara por causa de analytics/ads que ficam pendentes).
+                var aguardado = 0;
+                while (json is null && aguardado < 20000)
+                {
+                    await page.WaitForTimeoutAsync(500);
+                    aguardado += 500;
+                }
             }
             finally
             {
@@ -139,14 +156,19 @@ public sealed class DavoPrecoCollector(ILogger<DavoPrecoCollector> logger) : IPr
             await page.GotoAsync("https://www.davo.com.br/",
                 new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 45000 });
 
-            // Abre o seletor de loja ("Retirar na loja: ...").
-            await page.GetByText("Retirar na loja").First.ClickAsync(
-                new LocatorClickOptions { Timeout = 15000 });
+            // Aguarda o SPA renderizar o seletor de loja.
+            var seletor = page.GetByText("Retirar na loja").First;
+            await seletor.WaitForAsync(new LocatorWaitForOptions
+            {
+                State = WaitForSelectorState.Visible,
+                Timeout = 30000
+            });
+            await seletor.ClickAsync(new LocatorClickOptions { Timeout = 10000 });
             await page.WaitForTimeoutAsync(1500);
 
             // Seleciona "D'avó Suzano".
             await page.GetByText("D'avó Suzano").First.ClickAsync(
-                new LocatorClickOptions { Timeout = 10000 });
+                new LocatorClickOptions { Timeout = 15000 });
             await page.WaitForTimeoutAsync(2500);
         }
         catch (Exception ex) when (ex is TimeoutException or PlaywrightException)
