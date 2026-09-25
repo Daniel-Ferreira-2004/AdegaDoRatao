@@ -102,7 +102,7 @@ export function MarketPricesDialog({ open, onOpenChange, product }: MarketPrices
           <LoadingState
             message={
               atualizar.isPending
-                ? 'Pesquisando nas redes (Tenda, Atacadão, Shibata, Sonda)...'
+                ? 'Pesquisando nas redes (Tenda, Atacadão, Shibata, Sonda, D\'avó)...'
                 : 'Consultando preços nos mercados...'
             }
           />

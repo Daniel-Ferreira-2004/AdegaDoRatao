@@ -227,12 +227,14 @@ public static class DependencyInjection
         // Requer 'playwright install chromium' após o build (ver docs/19-AGENTE-PRECOS.md).
         services.AddScoped<ShibataPrecoCollector>();
         services.AddScoped<SondaPrecoCollector>();
+        services.AddScoped<DavoPrecoCollector>();
 
         // Expõe todos como IPrecoRedeCollector para o IEnumerable<> do serviço.
         services.AddScoped<IPrecoRedeCollector>(sp => sp.GetRequiredService<TendaPrecoCollector>());
         services.AddScoped<IPrecoRedeCollector>(sp => sp.GetRequiredService<AtacadaoPrecoCollector>());
         services.AddScoped<IPrecoRedeCollector>(sp => sp.GetRequiredService<ShibataPrecoCollector>());
         services.AddScoped<IPrecoRedeCollector>(sp => sp.GetRequiredService<SondaPrecoCollector>());
+        services.AddScoped<IPrecoRedeCollector>(sp => sp.GetRequiredService<DavoPrecoCollector>());
 
         services.AddScoped<IAtualizadorPrecosRedesService, AtualizadorPrecosRedesService>();
         services.AddHostedService<AtualizadorPrecosRedesJob>();

@@ -46,7 +46,10 @@ export async function getPrecosMercado(id: string): Promise<PrecoMercadoResponse
 
 /** Dispara a coleta de preços de um EAN em todas as redes (agente de preços). */
 export async function atualizarPrecosMercado(ean: string): Promise<void> {
-  await apiClient.post(`/precos/atualizar/${encodeURIComponent(ean)}`)
+  // Sem timeout: os coletores via navegador (Shibata, Sonda, D'avó) são
+  // lentos (15-45s cada) e o padrão de 30s do apiClient abortaria a
+  // requisição antes de terminarem.
+  await apiClient.post(`/precos/atualizar/${encodeURIComponent(ean)}`, undefined, { timeout: 0 })
 }
 
 export async function deleteProduct(id: string): Promise<void> {
