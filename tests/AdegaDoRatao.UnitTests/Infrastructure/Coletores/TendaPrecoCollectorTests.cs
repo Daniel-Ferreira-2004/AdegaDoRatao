@@ -82,6 +82,23 @@ public class TendaPrecoCollectorTests
     }
 
     [Fact]
+    public async Task Coletar_EanNaThumbnailMasVarianteDiferente_NaoAssociaPreco()
+    {
+        // Caso real (2026-09-25): busca "Leite Condensado Piracanjuba 395g"
+        // e o Tenda devolve o "Zero Lactose" com a MESMA thumbnail (EAN no
+        // nome do arquivo). O EAN na imagem não pode vencer a variante.
+        var html = PaginaBusca(
+            "[{\"name\":\"Leite Condensado Piracanjuba Zero Lactose 395g\",\"price\":8.39,\"isAvailable\":true,"
+            + "\"thumbnail\":\"https://cdn.tenda.com/img/" + Ean + ".jpg\",\"slug\":\"leite-condensado-zero-lactose-395g\"}]");
+        var handler = new FakeHttpHandler().QuandoHtml("busca", html);
+
+        var resultado = await CriarColetor(handler).ColetarAsync(Ean, "Leite Condensado Piracanjuba 395g");
+
+        resultado.Value!.Preco.Should().BeNull("zero lactose é outro produto, mesmo com o EAN na thumbnail");
+        resultado.Value!.Disponivel.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Coletar_ComWholesalePrice_DevolvePrecoCondicionado_MarcadoComoTal()
     {
         // Estrutura real do Tenda (2026-09-23): "price":4.99,

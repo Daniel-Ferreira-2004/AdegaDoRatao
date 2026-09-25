@@ -173,9 +173,16 @@ public sealed partial class TendaPrecoCollector(
                             url = $"https://www.tendaatacado.com.br/produto/{s.GetString()}";
                         }
 
+                        // O EAN na thumbnail NÃO basta sozinho: o Tenda
+                        // reutiliza imagens entre variantes (ex.: o leite
+                        // condensado Zero Lactose usa a foto do tradicional,
+                        // com o MESMO EAN no nome do arquivo). Exige também
+                        // os tokens obrigatórios — que rejeitam variantes
+                        // ("zero", "diet"...) ausentes na busca.
                         var thumbConfirma = atual.TryGetProperty("thumbnail", out var thumb)
                             && thumb.ValueKind == JsonValueKind.String
-                            && (thumb.GetString()?.Contains(ean) ?? false);
+                            && (thumb.GetString()?.Contains(ean) ?? false)
+                            && NomeProdutoMatcher.ContemTokensObrigatorios(nomeProduto, nome);
 
                         var candidato = (nome, (decimal?)preco, disponivel, url, thumbConfirma, tipo);
 

@@ -58,12 +58,21 @@ public class NomeProdutoMatcherTests
         => NomeProdutoMatcher.ContemTokensObrigatorios("Coca-Cola 2L", "Refrigerante Coca-Cola Pet 2L")
             .Should().BeTrue();
 
-    // Comportamento atual documentado: o matcher NÃO distingue variantes
-    // de sabor/tipo quando a medida coincide (ex.: "Coca 2L" casa com
-    // "Coca-Cola Zero 2L"). Risco registrado no perfil de cada site —
-    // a confirmação por EAN (Atacadão/Tenda) é a proteção real.
+    // Variantes excludentes: o candidato não pode declarar uma variante
+    // (zero, diet, light...) que a busca não declara — são produtos
+    // diferentes (regra 4 do protocolo).
     [Fact]
-    public void TokensObrigatorios_VarianteComMesmaMedida_Casa_ComportamentoConhecido()
-        => NomeProdutoMatcher.ContemTokensObrigatorios("Coca 2L", "Coca-Cola Zero 2L")
-            .Should().BeTrue("limitação conhecida: variantes com a mesma medida passam no matcher");
+    public void TokensObrigatorios_VarianteZeroAusenteNaBusca_NaoCasa()
+        => NomeProdutoMatcher.ContemTokensObrigatorios("Coca-Cola Original 2L", "Refrigerante Coca-cola Zero 2l")
+            .Should().BeFalse("zero é uma variante diferente do produto buscado");
+
+    [Fact]
+    public void TokensObrigatorios_VarianteZeroNaBusca_Casa()
+        => NomeProdutoMatcher.ContemTokensObrigatorios("Coca-Cola Zero 2L", "Refrigerante Coca-cola Zero 2l")
+            .Should().BeTrue("a busca também declara a variante zero");
+
+    [Fact]
+    public void TokensObrigatorios_VarianteDietAusenteNaBusca_NaoCasa()
+        => NomeProdutoMatcher.ContemTokensObrigatorios("Guaraná 2L", "Refrigerante Guaraná Diet 2L")
+            .Should().BeFalse("diet é uma variante diferente do produto buscado");
 }

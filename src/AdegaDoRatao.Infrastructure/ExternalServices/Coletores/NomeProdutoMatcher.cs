@@ -51,7 +51,18 @@ internal static class NomeProdutoMatcher
             return false;
         }
 
-        var tokens = Tokens(termoBuscado);
+        // Variantes excludentes: se o candidato declara uma variante que a
+        // busca NÃO declara, não é o mesmo produto (regra 4 do protocolo).
+        // Ex.: busca "Coca-Cola 2L" NÃO casa com "Coca-Cola Zero 2L";
+        // busca "Coca-Cola Zero 2L" casa (a busca também declara "zero").
+        var tokensBusca = Tokens(termoBuscado);
+        var tokensCandidato = Tokens(nomeCandidato);
+        if (tokensCandidato.Any(t => VariantesExcludentes.Contains(t) && !tokensBusca.Contains(t)))
+        {
+            return false;
+        }
+
+        var tokens = tokensBusca;
         var nome = Normalizar(nomeCandidato);
         // Tokens obrigatórios com dígito: prefere os PURAMENTE numéricos
         // ("5", "120"), que casam tanto com "5kg" quanto com "5 kg". Os
@@ -65,6 +76,16 @@ internal static class NomeProdutoMatcher
         return comDigito.All(nome.Contains)
             && (alfabeticos.Count == 0 || alfabeticos.Any(nome.Contains));
     }
+
+    /// <summary>
+    /// Tokens que definem uma VARIANTE do produto. Se o candidato tem um
+    /// deles e a busca não, são produtos diferentes (ex.: "Coca 2L" vs
+    /// "Coca Zero 2L"). Comparados como tokens exatos, não substring.
+    /// </summary>
+    private static readonly HashSet<string> VariantesExcludentes = new(StringComparer.Ordinal)
+    {
+        "zero", "diet", "light", "sem", "integral", "desnatado", "semidesnatado"
+    };
 
     private static List<string> Tokens(string texto)
         => Regex.Split(Normalizar(texto), @"[^a-z0-9]+")
