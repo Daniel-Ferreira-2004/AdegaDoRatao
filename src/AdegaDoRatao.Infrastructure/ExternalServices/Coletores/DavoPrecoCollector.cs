@@ -9,24 +9,27 @@ namespace AdegaDoRatao.Infrastructure.ExternalServices.Coletores;
 /// <summary>
 /// Coletor de preços do D'avó (davo.com.br) via Playwright.
 ///
-/// O site é um SPA Angular da plataforma VipCommerce. A busca funciona
-/// pela URL /busca?termo={termo}, que dispara a API interna:
+/// O site é um SPA Angular da plataforma VipCommerce. A busca é feita
+/// pela API interna:
 ///   GET services.vipcommerce.com.br/api-admin/v1/org/399/filial/1/
 ///       centro_distribuicao/{cd}/loja/buscas/produtos/termo/{termo}
 /// A API exige um token Bearer de sessão anônima que o SPA obtém
-/// automaticamente — por isso o coletor NÃO chama a API direto, e sim
-/// intercepta a resposta JSON da busca renderizada pelo navegador.
+/// automaticamente ao carregar. O coletor abre a home no Playwright,
+/// CAPTURA o header Authorization (e o sessao-id) das requisições do SPA
+/// e então chama a API de busca diretamente com esses headers — sem
+/// depender de cliques na UI (frágeis em headless).
 ///
-/// REGIÃO: a loja de SUZANO é o centro_distribuicao/4. O coletor abre a
-/// home, clica em "Retirar na loja" e seleciona "D'avó Suzano" — o SPA
-/// grava cdSelecionado=4 e passa a consultar o CD de Suzano.
+/// REGIÃO: a loja de SUZANO é o centro_distribuicao/4. O CD vai no PATH
+/// da busca, então basta consultar /centro_distribuicao/4/ — não é
+/// preciso selecionar a loja na UI. Confirmado por engenharia reversa:
+/// ao selecionar "D'avó Suzano" o SPA passa a usar cd=4 nas buscas.
 ///
 /// A API expõe o EAN (codigo_barras), então a confiança é High quando o
 /// EAN confere. O produto é escolhido pelo melhor score de tokens
 /// (<see cref="NomeProdutoMatcher"/>) entre os resultados.
 ///
-/// ATENÇÃO: lento (5-15s por consulta) e sensível a mudanças de layout.
-/// Deve rodar apenas no job diário, nunca em tempo real.
+/// ATENÇÃO: lento (5-15s por consulta). Deve rodar apenas no job diário,
+/// nunca em tempo real.
 /// </summary>
 public sealed class DavoPrecoCollector(ILogger<DavoPrecoCollector> logger) : IPrecoRedeCollector
 {
@@ -54,32 +57,47 @@ public sealed class DavoPrecoCollector(ILogger<DavoPrecoCollector> logger) : IPr
             });
             var page = await context.NewPageAsync();
 
-            // Seleciona a loja de Suzano antes de buscar — o preço é por CD.
-            await SelecionarLojaSuzano(page);
-
-            var termo = string.IsNullOrWhiteSpace(nomeProduto) ? ean : nomeProduto;
-
-            // Intercepta a resposta JSON da busca (a API exige o token de
-            // sessão que só o SPA tem — não dá para chamar direto).
-            string? json = null;
-            void Handler(object? sender, IResponse response)
+            // O SPA envia "Authorization: Bearer" (vazio) na 1ª carga e,
+            // após receber o token (X-Auth-Upgrade), passa a enviá-lo
+            // completo nas requisições seguintes. Captura o PRIMEIRO
+            // authorization com token real (mais que "Bearer").
+            string? authorization = null;
+            string? sessaoId = null;
+            void RequestHandler(object? sender, IRequest request)
             {
-                if (response.Url.Contains("buscas/produtos/termo/", StringComparison.OrdinalIgnoreCase))
+                if (!request.Url.Contains("services.vipcommerce.com.br", StringComparison.OrdinalIgnoreCase))
                 {
-                    try { json = response.JsonAsync().GetAwaiter().GetResult()?.GetRawText(); }
-                    catch { /* resposta não-JSON */ }
+                    return;
+                }
+
+                if (sessaoId is null
+                    && request.Headers.TryGetValue("sessao-id", out var sid)
+                    && !string.IsNullOrWhiteSpace(sid))
+                {
+                    sessaoId = sid;
+                }
+
+                if (authorization is null
+                    && request.Headers.TryGetValue("authorization", out var auth)
+                    && !string.IsNullOrWhiteSpace(auth)
+                    && auth.Length > 10) // ignora "Bearer" vazio
+                {
+                    authorization = auth;
                 }
             }
-            page.Response += Handler;
+            page.Request += RequestHandler;
             try
             {
-                await page.GotoAsync($"https://www.davo.com.br/busca?termo={Uri.EscapeDataString(termo)}",
+                await page.GotoAsync("https://www.davo.com.br/",
                     new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 45000 });
 
-                // Aguarda a resposta da API de busca (NetworkIdle nem sempre
-                // dispara por causa de analytics/ads que ficam pendentes).
+                // Navega para uma busca para forçar o SPA a usar o token
+                // já atualizado nas chamadas autenticadas.
+                await page.GotoAsync("https://www.davo.com.br/busca?termo=a",
+                    new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 45000 });
+
                 var aguardado = 0;
-                while (json is null && aguardado < 20000)
+                while (authorization is null && aguardado < 25000)
                 {
                     await page.WaitForTimeoutAsync(500);
                     aguardado += 500;
@@ -87,7 +105,47 @@ public sealed class DavoPrecoCollector(ILogger<DavoPrecoCollector> logger) : IPr
             }
             finally
             {
-                page.Response -= Handler;
+                page.Request -= RequestHandler;
+            }
+
+            if (authorization is null)
+            {
+                logger.LogWarning("D'avó: não foi possível capturar o token de sessão do SPA.");
+                return Result<ColetaPrecoRede>.Failure("Falha ao autenticar no site do D'avó.");
+            }
+
+            var termo = string.IsNullOrWhiteSpace(nomeProduto) ? ean : nomeProduto;
+
+            // Chama a API de busca DIRETO com o token capturado, usando o
+            // CD de Suzano no path — o preço retornado é o da loja de Suzano.
+            var url = $"https://services.vipcommerce.com.br/api-admin/v1/org/399/filial/1/centro_distribuicao/{CdSuzano}/loja/buscas/produtos/termo/{Uri.EscapeDataString(termo)}?page=1&session={sessaoId}";
+            var resposta = await page.EvaluateAsync<string?>(
+                @"async ([url, auth, sessao]) => {
+                    try {
+                        const r = await fetch(url, { headers: {
+                            'authorization': auth,
+                            'domainkey': 'davo.com.br',
+                            'organizationid': '399',
+                            'sessao-id': sessao ?? '',
+                            'accept': 'application/json'
+                        }});
+                        const corpo = await r.text();
+                        return r.status + '||' + corpo;
+                    } catch (e) { return 'ERR||' + e; }
+                }", new[] { url, authorization, sessaoId ?? "" });
+
+            var json = resposta;
+            if (resposta is not null)
+            {
+                var sep = resposta.IndexOf("||", StringComparison.Ordinal);
+                var status = sep >= 0 ? resposta[..sep] : "?";
+                json = sep >= 0 ? resposta[(sep + 2)..] : resposta;
+                logger.LogInformation("D'avó: API de busca respondeu {Status} para '{Termo}'.", status, termo);
+                if (status != "200")
+                {
+                    logger.LogWarning("D'avó: corpo da resposta: {Corpo}", json?.Length > 300 ? json[..300] : json);
+                    json = null;
+                }
             }
 
             var itens = Desserializar(json);
@@ -102,81 +160,55 @@ public sealed class DavoPrecoCollector(ILogger<DavoPrecoCollector> logger) : IPr
                     new ColetaPrecoRede(Rede, null, null, Disponivel: false));
             }
 
-            // Escolhe o produto com melhor score de tokens, exigindo os
-            // tokens obrigatórios (medidas como "2l" e marca como "coca").
-            var melhor = itens
+            // PRIORIDADE 1: match exato de EAN — a API expõe codigo_barras,
+            // então quando o EAN confere não há ambiguidade (evita escolher
+            // um kit/variante com score de tokens maior).
+            var porEan = itens.FirstOrDefault(x =>
+                !string.IsNullOrWhiteSpace(ean)
+                && string.Equals(x.CodigoBarras?.Trim(), ean.Trim(), StringComparison.OrdinalIgnoreCase));
+
+            // PRIORIDADE 2: melhor score de tokens, exigindo os tokens
+            // obrigatórios (medidas como "2l" e marca como "coca").
+            var porScore = itens
                 .Select(x => (Item: x, Score: NomeProdutoMatcher.Pontuar(termo, x.Descricao)))
                 .Where(x => x.Score >= NomeProdutoMatcher.ScoreMinimo
                     && NomeProdutoMatcher.ContemTokensObrigatorios(termo, x.Item.Descricao))
                 .OrderByDescending(x => x.Score)
                 .FirstOrDefault();
 
-            if (melhor.Item is null)
+            var melhorItem = porEan ?? porScore.Item;
+
+            if (melhorItem is null)
             {
-                logger.LogWarning("D'avó: nenhum resultado casou com os tokens obrigatórios de '{Termo}'.", termo);
+                logger.LogWarning("D'avó: nenhum resultado casou com o EAN ou os tokens obrigatórios de '{Termo}'.", termo);
                 return Result<ColetaPrecoRede>.Success(
                     new ColetaPrecoRede(Rede, null, null, Disponivel: false));
             }
 
             // Preço de oferta (quando em_oferta) tem prioridade — é o
             // preço em destaque no site.
-            var preco = melhor.Item.PrecoOferta ?? melhor.Item.Preco;
-            var disponivel = melhor.Item.Disponivel && preco is not null;
-            var url = melhor.Item.Link is not null
-                ? $"https://www.davo.com.br/produto/{melhor.Item.Link}"
+            var preco = melhorItem.PrecoOferta ?? melhorItem.Preco;
+            var disponivel = melhorItem.Disponivel && preco is not null;
+            var urlProduto = melhorItem.Link is not null
+                ? $"https://www.davo.com.br/produto/{melhorItem.Link}"
                 : null;
 
             // A API expõe o EAN: confiança High quando confere, Medium só
             // por nome. Região CONFIRMADA (CD de Suzano selecionado).
             var confirmadoPorEan = !string.IsNullOrWhiteSpace(ean)
-                && string.Equals(melhor.Item.CodigoBarras?.Trim(), ean.Trim(), StringComparison.OrdinalIgnoreCase);
+                && string.Equals(melhorItem.CodigoBarras?.Trim(), ean.Trim(), StringComparison.OrdinalIgnoreCase);
             var confianca = preco is null
                 ? NivelConfiancaColeta.Unverified
                 : confirmadoPorEan ? NivelConfiancaColeta.High : NivelConfiancaColeta.Medium;
 
             return Result<ColetaPrecoRede>.Success(new ColetaPrecoRede(
-                Rede, melhor.Item.Descricao, preco, disponivel, url,
+                Rede, melhorItem.Descricao, preco, disponivel, urlProduto,
                 TipoPrecoColeta.Normal, confianca, RegiaoConfirmada: true));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogWarning(ex, "D'avó: falha ao coletar o EAN {Ean} via Playwright.", ean);
             return Result<ColetaPrecoRede>.Failure("Falha ao consultar o site do D'avó.");
-        }
-    }
-
-    /// <summary>
-    /// Abre a home e seleciona a loja "D'avó Suzano" no seletor de loja,
-    /// para que as buscas usem o centro de distribuição de Suzano.
-    /// </summary>
-    private async Task SelecionarLojaSuzano(IPage page)
-    {
-        try
-        {
-            await page.GotoAsync("https://www.davo.com.br/",
-                new PageGotoOptions { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 45000 });
-
-            // Aguarda o SPA renderizar o seletor de loja.
-            var seletor = page.GetByText("Retirar na loja").First;
-            await seletor.WaitForAsync(new LocatorWaitForOptions
-            {
-                State = WaitForSelectorState.Visible,
-                Timeout = 30000
-            });
-            await seletor.ClickAsync(new LocatorClickOptions { Timeout = 10000 });
-            await page.WaitForTimeoutAsync(1500);
-
-            // Seleciona "D'avó Suzano".
-            await page.GetByText("D'avó Suzano").First.ClickAsync(
-                new LocatorClickOptions { Timeout = 15000 });
-            await page.WaitForTimeoutAsync(2500);
-        }
-        catch (Exception ex) when (ex is TimeoutException or PlaywrightException)
-        {
-            // Se não conseguir trocar de loja, segue com a loja padrão —
-            // o preço pode ser de outra região (sinalizado pelo chamador
-            // via RegiaoConfirmada quando necessário).
-            logger.LogWarning(ex, "D'avó: não foi possível selecionar a loja de Suzano.");
         }
     }
 
